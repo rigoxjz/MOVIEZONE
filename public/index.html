@@ -19,35 +19,24 @@
 }
 
 :root {
-
-    --bg: #08090d;
-    --card: #11131a;
-    --card2: #171922;
-    --text: #fff;
-    --muted: #9ca0ad;
-
-    --accent: #e50914;
-    --accent-hover: #ff1723;
+    --bg:#08090d;
+    --card:#11131a;
+    --card2:#171922;
+    --text:#fff;
+    --muted:#9ca0ad;
+    --accent:#e50914;
+    --accent-hover:#ff1723;
 }
 
 html {
-    scroll-behavior: smooth;
+    scroll-behavior:smooth;
 }
 
 body {
-
-    margin: 0;
-
-    background:
-        var(--bg);
-
-    color:
-        var(--text);
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Arial,Helvetica,sans-serif;
 }
 
 
@@ -57,101 +46,92 @@ body {
 
 header {
 
-    position: sticky;
+    position:sticky;
+    top:0;
+    z-index:100;
 
-    top: 0;
+    min-height:70px;
 
-    z-index: 1000;
+    display:flex;
+    align-items:center;
+    gap:30px;
 
-    min-height: 70px;
+    padding:12px 5%;
 
-    display: flex;
+    background:rgba(8,9,13,.94);
 
-    align-items: center;
+    backdrop-filter:blur(15px);
 
-    justify-content: space-between;
+    border-bottom:1px solid rgba(255,255,255,.06);
 
-    gap: 20px;
-
-    padding:
-        0 5%;
-
-    background:
-        rgba(8,9,13,.96);
-
-    backdrop-filter:
-        blur(15px);
-
-    border-bottom:
-        1px solid
-        rgba(255,255,255,.07);
 }
 
 .logo {
 
-    font-size: 25px;
+    font-size:25px;
 
-    font-weight: 900;
+    font-weight:900;
 
-    white-space: nowrap;
+    white-space:nowrap;
+
 }
 
 .logo span {
-    color: var(--accent);
+
+    color:var(--accent);
+
 }
 
 nav {
 
-    display: flex;
+    display:flex;
 
-    align-items: center;
+    gap:22px;
 
-    gap: 24px;
+    flex:1;
+
 }
 
 nav a {
 
-    color: #ccc;
+    color:#ccc;
 
-    text-decoration: none;
+    text-decoration:none;
 
-    font-size: 14px;
+    font-size:14px;
 
-    transition: .2s;
+    cursor:pointer;
+
 }
 
-nav a:hover,
-nav a.active {
+nav a:hover {
 
-    color: white;
+    color:white;
+
 }
 
 .search {
 
-    width: 220px;
+    width:220px;
 
-    background:
-        #151720;
+    background:#151720;
 
-    border:
-        1px solid
-        #252835;
+    border:1px solid #252835;
 
-    border-radius:
-        30px;
+    border-radius:30px;
 
-    padding:
-        11px 16px;
+    padding:11px 16px;
 
-    color: white;
+    color:white;
 
-    outline: none;
+    outline:none;
+
 }
 
 .search:focus {
 
-    border-color:
-        var(--accent);
+    border-color:var(--accent);
+
 }
 
 
@@ -161,23 +141,21 @@ nav a.active {
 
 .hero {
 
-    min-height: 540px;
+    min-height:500px;
 
-    display: flex;
+    display:flex;
 
-    align-items: flex-end;
+    align-items:flex-end;
 
-    padding:
-        80px 6%;
+    padding:70px 6%;
 
     background:
 
         linear-gradient(
             90deg,
             #08090d 0%,
-            rgba(8,9,13,.9) 32%,
-            rgba(8,9,13,.35) 70%,
-            rgba(8,9,13,.1) 100%
+            rgba(8,9,13,.86) 35%,
+            rgba(8,9,13,.15) 100%
         ),
 
         linear-gradient(
@@ -186,71 +164,88 @@ nav a.active {
             transparent 55%
         ),
 
-        url("https://image.tmdb.org/t/p/original/63RnEJRNzRDvi0Fv4jhrT2eh0fl.jpg")
-        center/cover;
+        radial-gradient(
+            circle at 70% 40%,
+            #242734,
+            #08090d 60%
+        );
+
 }
 
 .hero-content {
 
-    max-width:
-        680px;
+    max-width:700px;
+
 }
 
 .badge {
 
-    display:
-        inline-block;
+    display:inline-block;
 
-    background:
-        var(--accent);
+    background:var(--accent);
 
-    padding:
-        7px 12px;
+    padding:7px 12px;
 
-    border-radius:
-        5px;
+    border-radius:5px;
 
-    font-size:
-        12px;
+    font-size:12px;
 
-    font-weight:
-        bold;
+    font-weight:bold;
 
-    margin-bottom:
-        15px;
+    margin-bottom:15px;
+
 }
 
 .hero h1 {
 
-    font-size:
-        clamp(38px,6vw,68px);
+    font-size:clamp(
+        40px,
+        6vw,
+        70px
+    );
 
-    line-height:
-        .95;
+    line-height:.95;
 
-    margin:
-        0 0 18px;
+    margin:0 0 18px;
+
 }
 
 .hero p {
 
-    color:
-        #d0d0d5;
+    color:#d0d0d5;
 
-    line-height:
-        1.6;
+    line-height:1.6;
 
-    max-width:
-        600px;
+    max-width:600px;
+
 }
 
-.hero .watch {
+.watch {
 
-    display:
-        inline-flex;
+    display:inline-flex;
 
-    margin-top:
-        12px;
+    align-items:center;
+
+    gap:9px;
+
+    background:var(--accent);
+
+    color:white;
+
+    padding:14px 22px;
+
+    border-radius:7px;
+
+    text-decoration:none;
+
+    font-weight:bold;
+
+}
+
+.watch:hover {
+
+    background:var(--accent-hover);
+
 }
 
 
@@ -260,64 +255,42 @@ nav a.active {
 
 main {
 
-    width:
-        90%;
+    width:90%;
 
-    max-width:
-        1400px;
+    max-width:1300px;
 
-    margin:
-        auto;
+    margin:auto;
 
-    padding:
-        45px 0 80px;
-}
+    padding:45px 0 80px;
 
-
-/* =====================================================
-   SECCIONES
-===================================================== */
-
-.page-section {
-
-    margin-bottom:
-        60px;
 }
 
 .section-title {
 
-    display:
-        flex;
+    display:flex;
 
-    justify-content:
-        space-between;
+    justify-content:space-between;
 
-    align-items:
-        center;
+    align-items:center;
 
-    gap:
-        15px;
+    margin-bottom:20px;
 
-    margin-bottom:
-        20px;
 }
 
 .section-title h2 {
 
-    margin:
-        0;
+    margin:0;
 
-    font-size:
-        25px;
+    font-size:25px;
+
 }
 
 .section-title span {
 
-    color:
-        var(--muted);
+    color:var(--muted);
 
-    font-size:
-        13px;
+    font-size:13px;
+
 }
 
 
@@ -327,78 +300,37 @@ main {
 
 .player-container {
 
-    background:
-        #000;
+    background:#000;
 
-    border-radius:
-        12px;
+    border-radius:12px;
 
-    overflow:
-        hidden;
+    overflow:hidden;
 
     box-shadow:
-        0 20px 60px
-        rgba(0,0,0,.45);
+        0 20px 60px rgba(0,0,0,.45);
 
-    border:
-        1px solid
-        #1e2029;
+    border:1px solid #1e2029;
+
 }
 
 .player {
 
-    width:
-        100%;
+    width:100%;
 
-    aspect-ratio:
-        16/9;
+    aspect-ratio:16/9;
+
 }
 
 iframe {
 
-    width:
-        100%;
+    width:100%;
 
-    height:
-        100%;
+    height:100%;
 
-    border:
-        0;
+    border:0;
 
-    display:
-        block;
-}
+    display:block;
 
-
-/* =====================================================
-   ESTADO DEL REPRODUCTOR
-===================================================== */
-
-.player-message {
-
-    min-height:
-        180px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    text-align:
-        center;
-
-    padding:
-        30px;
-
-    color:
-        #999;
-
-    background:
-        #050505;
 }
 
 
@@ -408,70 +340,56 @@ iframe {
 
 .movie-info {
 
-    margin-top:
-        25px;
+    margin-top:25px;
 
-    background:
-        var(--card);
+    background:var(--card);
 
-    border:
-        1px solid
-        #1e2029;
+    border:1px solid #1e2029;
 
-    border-radius:
-        12px;
+    border-radius:12px;
 
-    padding:
-        25px;
+    padding:25px;
+
 }
 
 .movie-info h2 {
 
-    margin-top:
-        0;
+    margin-top:0;
+
 }
 
 .movie-info p {
 
-    color:
-        var(--muted);
+    color:var(--muted);
 
-    line-height:
-        1.7;
+    line-height:1.7;
+
 }
 
 .tags {
 
-    display:
-        flex;
+    display:flex;
 
-    gap:
-        8px;
+    gap:8px;
 
-    flex-wrap:
-        wrap;
+    flex-wrap:wrap;
+
 }
 
 .tag {
 
-    background:
-        var(--card2);
+    background:var(--card2);
 
-    border:
-        1px solid
-        #272a35;
+    border:1px solid #272a35;
 
-    padding:
-        7px 11px;
+    padding:7px 11px;
 
-    border-radius:
-        20px;
+    border-radius:20px;
 
-    font-size:
-        12px;
+    font-size:12px;
 
-    color:
-        #bbb;
+    color:#bbb;
+
 }
 
 
@@ -481,8 +399,7 @@ iframe {
 
 .movies {
 
-    display:
-        grid;
+    display:grid;
 
     grid-template-columns:
         repeat(
@@ -490,114 +407,128 @@ iframe {
             minmax(170px,1fr)
         );
 
-    gap:
-        18px;
+    gap:18px;
+
 }
 
 .movie {
 
-    background:
-        var(--card);
+    background:var(--card);
 
-    border-radius:
-        9px;
+    border-radius:9px;
 
-    overflow:
-        hidden;
+    overflow:hidden;
 
-    transition:
-        .25s;
+    transition:.25s;
 
-    cursor:
-        pointer;
+    cursor:pointer;
 
-    border:
-        1px solid
-        transparent;
+    border:1px solid transparent;
+
 }
 
 .movie:hover {
 
-    transform:
-        translateY(-6px);
+    transform:translateY(-6px);
 
-    border-color:
-        #30333f;
+    border-color:#30333f;
+
+}
+
+.poster-wrap {
+
+    position:relative;
+
 }
 
 .movie img {
 
-    width:
-        100%;
+    width:100%;
 
-    aspect-ratio:
-        2/3;
+    aspect-ratio:2/3;
 
-    object-fit:
-        cover;
+    object-fit:cover;
 
-    display:
-        block;
+    display:block;
 
-    background:
-        #171922;
+}
+
+.type-badge,
+.available,
+.unavailable {
+
+    position:absolute;
+
+    top:8px;
+
+    padding:5px 7px;
+
+    border-radius:4px;
+
+    font-size:10px;
+
+    font-weight:bold;
+
+}
+
+.type-badge {
+
+    left:8px;
+
+    background:rgba(0,0,0,.75);
+
+}
+
+.available {
+
+    right:8px;
+
+    background:#16803c;
+
+}
+
+.unavailable {
+
+    right:8px;
+
+    background:#555;
+
 }
 
 .movie-info-small {
 
-    padding:
-        12px;
+    padding:12px;
+
 }
 
 .movie-info-small h3 {
 
-    margin:
-        0 0 7px;
+    margin:0 0 7px;
 
-    font-size:
-        14px;
+    font-size:14px;
 
-    line-height:
-        1.3;
+    line-height:1.35;
+
 }
 
 .movie-info-small span {
 
-    color:
-        #999;
+    color:#999;
 
-    font-size:
-        12px;
+    font-size:12px;
+
 }
 
 .loading {
 
-    grid-column:
-        1/-1;
+    grid-column:1/-1;
 
-    text-align:
-        center;
+    text-align:center;
 
-    padding:
-        50px;
+    padding:50px;
 
-    color:
-        #999;
-}
+    color:#999;
 
-.empty {
-
-    grid-column:
-        1/-1;
-
-    padding:
-        50px;
-
-    text-align:
-        center;
-
-    color:
-        #777;
 }
 
 
@@ -605,84 +536,70 @@ iframe {
    EPISODIOS
 ===================================================== */
 
-.episodes-section {
+.episodes-grid {
 
-    margin-top:
-        25px;
-
-    background:
-        var(--card);
-
-    border:
-        1px solid
-        #1e2029;
-
-    border-radius:
-        12px;
-
-    padding:
-        25px;
-}
-
-.episodes-list {
-
-    display:
-        grid;
+    display:grid;
 
     grid-template-columns:
         repeat(
             auto-fill,
-            minmax(200px,1fr)
+            minmax(180px,1fr)
         );
 
-    gap:
-        10px;
+    gap:10px;
+
 }
 
-.episode-button {
+.episode {
 
-    background:
-        #171922;
+    display:flex;
 
-    color:
-        white;
+    justify-content:space-between;
 
-    border:
-        1px solid
-        #292c38;
+    align-items:center;
 
-    padding:
-        14px;
+    gap:10px;
 
-    border-radius:
-        7px;
+    padding:14px;
 
-    text-align:
-        left;
+    border-radius:7px;
 
-    cursor:
-        pointer;
+    text-align:left;
 
-    transition:
-        .2s;
+    cursor:pointer;
+
+    color:white;
+
 }
 
-.episode-button:hover {
+.available-episode {
 
-    border-color:
-        var(--accent);
+    background:#171922;
 
-    background:
-        #1d202b;
+    border:1px solid #292c38;
+
 }
 
-.episode-button.disabled {
+.available-episode:hover {
 
-    opacity:
-        .55;
+    border-color:var(--accent);
 
-    cursor:
-        not-allowed;
+}
+
+.unavailable-episode {
+
+    background:#111;
+
+    border:1px solid #222;
+
+    color:#777;
+
+}
+
+.episode span {
+
+    font-size:11px;
+
 }
 
 
@@ -692,21 +609,16 @@ iframe {
 
 footer {
 
-    border-top:
-        1px solid
-        #1c1e27;
+    border-top:1px solid #1c1e27;
 
-    padding:
-        35px 5%;
+    padding:35px 5%;
 
-    text-align:
-        center;
+    text-align:center;
 
-    color:
-        #666;
+    color:#666;
 
-    font-size:
-        13px;
+    font-size:13px;
+
 }
 
 
@@ -714,95 +626,97 @@ footer {
    MOBILE
 ===================================================== */
 
-@media(max-width:800px) {
+@media(max-width:700px) {
 
     header {
 
-        min-height:
-            60px;
+        min-height:60px;
 
-        padding:
-            10px 18px;
+        padding:10px 18px;
 
-        flex-wrap:
-            wrap;
+        gap:10px;
+
+        flex-wrap:wrap;
+
     }
 
     nav {
 
-        order:
-            3;
+        order:3;
 
-        width:
-            100%;
+        width:100%;
 
-        justify-content:
-            center;
+        justify-content:center;
 
-        overflow-x:
-            auto;
+        gap:18px;
 
-        padding-bottom:
-            5px;
+    }
+
+    nav a {
+
+        font-size:12px;
+
     }
 
     .logo {
-        font-size: 21px;
+
+        font-size:21px;
+
     }
 
     .search {
 
-        width:
-            150px;
+        margin-left:auto;
+
+        width:145px;
+
+        padding:9px 13px;
+
     }
 
     .hero {
 
-        min-height:
-            480px;
+        min-height:470px;
 
-        padding:
-            35px 20px;
+        padding:35px 20px;
+
     }
 
     .hero h1 {
 
-        font-size:
-            40px;
+        font-size:40px;
+
     }
 
     main {
 
-        width:
-            94%;
+        width:94%;
 
-        padding-top:
-            30px;
+        padding-top:30px;
+
     }
 
     .movies {
 
         grid-template-columns:
-            repeat(
-                2,
-                1fr
-            );
+            repeat(2,1fr);
 
-        gap:
-            12px;
+        gap:12px;
+
     }
 
     .movie-info {
 
-        padding:
-            18px;
+        padding:18px;
+
     }
 
-    .episodes-section {
+    .episodes-grid {
 
-        padding:
-            18px;
+        grid-template-columns:1fr;
+
     }
+
 }
 
 </style>
@@ -823,37 +737,31 @@ footer {
     <nav>
 
         <a
-            href="/"
-            data-section="inicio"
+            href="#inicio"
+            data-seccion="peliculas"
         >
             Inicio
         </a>
 
         <a
-            href="/peliculas"
-            data-section="peliculas"
+            href="#peliculas"
+            data-seccion="peliculas"
         >
             Películas
         </a>
 
         <a
-            href="/series"
-            data-section="series"
+            href="#series"
+            data-seccion="series"
         >
             Series
         </a>
 
         <a
-            href="/animes"
-            data-section="animes"
+            href="#anime"
+            data-seccion="anime"
         >
             Anime
-        </a>
-
-        <a
-            href="#reproductor"
-        >
-            Reproductor
         </a>
 
     </nav>
@@ -870,9 +778,9 @@ footer {
 </header>
 
 
-<!-- =====================================================
+<!-- ==================================================
      HERO
-===================================================== -->
+=================================================== -->
 
 <section
     class="hero"
@@ -885,20 +793,22 @@ footer {
             MOVIEZONE
         </div>
 
+
         <h1 id="hero-title">
-            Películas, series y anime
+            Descubre tu próximo contenido
         </h1>
 
+
         <p id="hero-description">
-            Explora el catálogo disponible,
-            selecciona una producción y
-            disfruta de sus episodios cuando
-            estén disponibles.
+            Películas, series y anime.
+            Explora el catálogo y selecciona
+            lo que quieras reproducir.
         </p>
 
+
         <a
+            href="#peliculas"
             class="watch"
-            href="#catalogo"
         >
             ▶ Explorar catálogo
         </a>
@@ -911,23 +821,20 @@ footer {
 <main>
 
 
-<!-- =====================================================
+<!-- ==================================================
      REPRODUCTOR
-===================================================== -->
+=================================================== -->
 
-<section
-    id="reproductor"
-    class="page-section"
->
+<section id="reproductor">
 
     <div class="section-title">
 
         <h2 id="player-title">
-            Reproducir
+            Reproductor
         </h2>
 
         <span>
-            Reproductor
+            Selecciona un contenido
         </span>
 
     </div>
@@ -935,18 +842,15 @@ footer {
 
     <div class="player-container">
 
-        <div
-            class="player"
-            id="player-wrapper"
-        >
+        <div class="player">
 
-            <div
-                class="player-message"
-                id="player-message"
-            >
-                Selecciona una película,
-                serie o episodio.
-            </div>
+            <iframe
+                id="player"
+                src="about:blank"
+                title="Reproductor"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+            ></iframe>
 
         </div>
 
@@ -955,9 +859,9 @@ footer {
 </section>
 
 
-<!-- =====================================================
+<!-- ==================================================
      INFORMACIÓN
-===================================================== -->
+=================================================== -->
 
 <section class="movie-info">
 
@@ -967,11 +871,8 @@ footer {
 
 
     <p id="info-description">
-
-        Selecciona una película,
-        serie o anime para consultar
-        su información.
-
+        Aquí aparecerá la información
+        del contenido seleccionado.
     </p>
 
 
@@ -983,13 +884,13 @@ footer {
 </section>
 
 
-<!-- =====================================================
-     CATÁLOGO INICIO
-===================================================== -->
+<!-- ==================================================
+     CATÁLOGO
+=================================================== -->
 
 <section
-    id="catalogo"
-    class="page-section"
+    id="peliculas"
+    style="margin-top:50px;"
 >
 
     <div class="section-title">
@@ -1011,115 +912,7 @@ footer {
     >
 
         <div class="loading">
-            Cargando catálogo...
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     PELÍCULAS
-===================================================== -->
-
-<section
-    id="seccion-peliculas"
-    class="page-section"
->
-
-    <div class="section-title">
-
-        <h2>
-            Películas
-        </h2>
-
-        <span id="peliculas-info">
-            Cargando...
-        </span>
-
-    </div>
-
-
-    <div
-        class="movies"
-        id="peliculas-container"
-    >
-
-        <div class="loading">
-            Cargando películas...
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     SERIES
-===================================================== -->
-
-<section
-    id="seccion-series"
-    class="page-section"
->
-
-    <div class="section-title">
-
-        <h2>
-            Series
-        </h2>
-
-        <span id="series-info">
-            Cargando...
-        </span>
-
-    </div>
-
-
-    <div
-        class="movies"
-        id="series-container"
-    >
-
-        <div class="loading">
-            Cargando series...
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     ANIME
-===================================================== -->
-
-<section
-    id="seccion-animes"
-    class="page-section"
->
-
-    <div class="section-title">
-
-        <h2>
-            Anime
-        </h2>
-
-        <span id="animes-info">
-            Cargando...
-        </span>
-
-    </div>
-
-
-    <div
-        class="movies"
-        id="animes-container"
-    >
-
-        <div class="loading">
-            Cargando anime...
+            Cargando recomendaciones...
         </div>
 
     </div>
@@ -1138,7 +931,7 @@ footer {
 </footer>
 
 
-<script src="/app.js"></script>
+<script src="app.js"></script>
 
 </body>
 
