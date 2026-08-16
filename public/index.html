@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>MovieZone</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #08090d;
+    --card: #11131a;
+    --card2: #171922;
+    --text: #fff;
+    --muted: #9ca0ad;
+    --accent: #e50914;
+    --accent-hover: #ff1723;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+
+/* HEADER */
+
+header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+
+    height: 70px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 30px;
+
+    padding: 0 5%;
+
+    background: rgba(8,9,13,.96);
+
+    backdrop-filter: blur(15px);
+
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.logo {
+    font-size: 25px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.logo span {
+    color: var(--accent);
+}
+
+nav {
+    display: flex;
+    gap: 22px;
+    flex: 1;
+}
+
+nav a {
+    color: #bbb;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+nav a:hover {
+    color: white;
+}
+
+.search {
+    width: 230px;
+
+    background: #151720;
+
+    border: 1px solid #252835;
+
+    border-radius: 30px;
+
+    padding: 11px 16px;
+
+    color: white;
+
+    outline: none;
+}
+
+.search:focus {
+    border-color: var(--accent);
+}
+
+
+/* HERO */
+
+.hero {
+    min-height: 510px;
+
+    display: flex;
+    align-items: center;
+
+    padding: 70px 7%;
+
+    background:
+        linear-gradient(
+            90deg,
+            #08090d 0%,
+            rgba(8,9,13,.82) 45%,
+            rgba(8,9,13,.18) 100%
+        ),
+        linear-gradient(
+            0deg,
+            #08090d 0%,
+            transparent 55%
+        ),
+        radial-gradient(
+            circle at 75% 35%,
+            #4b1117,
+            #08090d 60%
+        );
+}
+
+.hero-content {
+    max-width: 700px;
+}
+
+.badge {
+    display: inline-block;
+
+    background: var(--accent);
+
+    padding: 7px 12px;
+
+    border-radius: 5px;
+
+    font-size: 12px;
+
+    font-weight: bold;
+
+    margin-bottom: 15px;
+}
+
+.hero h1 {
+    font-size: clamp(42px, 7vw, 75px);
+
+    line-height: .95;
+
+    margin: 0 0 18px;
+}
+
+.hero p {
+    color: #d0d0d5;
+
+    line-height: 1.6;
+
+    max-width: 620px;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 12px;
+
+    margin-top: 25px;
+}
+
+.watch {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    background: var(--accent);
+
+    color: white;
+
+    padding: 14px 22px;
+
+    border-radius: 7px;
+
+    text-decoration: none;
+
+    font-weight: bold;
+}
+
+.watch:hover {
+    background: var(--accent-hover);
+}
+
+
+/* MAIN */
+
+main {
+    width: 90%;
+
+    max-width: 1400px;
+
+    margin: auto;
+
+    padding: 45px 0 80px;
+}
+
+.section {
+    margin-bottom: 55px;
+}
+
+.section-title {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 20px;
+}
+
+.section-title h2 {
+    margin: 0;
+
+    font-size: 25px;
+}
+
+.section-title span {
+    color: var(--muted);
+
+    font-size: 13px;
+}
+
+
+/* MOVIES */
+
+.movies {
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fill,minmax(175px,1fr));
+
+    gap: 18px;
+}
+
+.movie {
+    background: var(--card);
+
+    border-radius: 9px;
+
+    overflow: hidden;
+
+    transition: .25s;
+
+    cursor: pointer;
+
+    border: 1px solid transparent;
+}
+
+.movie:hover {
+    transform: translateY(-6px);
+
+    border-color: #30333f;
+}
+
+.movie img {
+    width: 100%;
+
+    aspect-ratio: 2/3;
+
+    object-fit: cover;
+
+    display: block;
+
+    background: #171922;
+}
+
+.movie-info-small {
+    padding: 12px;
+}
+
+.movie-info-small h3 {
+    margin: 0 0 7px;
+
+    font-size: 14px;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+.movie-info-small span {
+    color: #999;
+
+    font-size: 12px;
+}
+
+
+/* PLAYER */
+
+.player-container {
+    background: #000;
+
+    border-radius: 12px;
+
+    overflow: hidden;
+
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+
+    border: 1px solid #1e2029;
+}
+
+.player {
+    width: 100%;
+
+    aspect-ratio: 16/9;
+}
+
+iframe {
+    width: 100%;
+
+    height: 100%;
+
+    border: 0;
+
+    display: block;
+}
+
+
+/* INFO */
+
+.movie-info {
+    margin-top: 25px;
+
+    background: var(--card);
+
+    border: 1px solid #1e2029;
+
+    border-radius: 12px;
+
+    padding: 25px;
+}
+
+.movie-info h2 {
+    margin-top: 0;
+}
+
+.movie-info p {
+    color: var(--muted);
+
+    line-height: 1.7;
+}
+
+.tags {
+    display: flex;
+
+    gap: 8px;
+
+    flex-wrap: wrap;
+}
+
+.tag {
+    background: var(--card2);
+
+    border: 1px solid #272a35;
+
+    padding: 7px 11px;
+
+    border-radius: 20px;
+
+    font-size: 12px;
+
+    color: #bbb;
+}
+
+
+/* EPISODIOS */
+
+.episodes {
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fill,minmax(220px,1fr));
+
+    gap: 10px;
+}
+
+.episode {
+    background: var(--card2);
+
+    color: white;
+
+    border: 1px solid #292c38;
+
+    padding: 14px;
+
+    border-radius: 7px;
+
+    text-align: left;
+
+    cursor: pointer;
+
+    transition: .2s;
+}
+
+.episode:hover {
+    border-color: var(--accent);
+
+    transform: translateY(-2px);
+}
+
+.episode small {
+    display: block;
+
+    color: #888;
+
+    margin-top: 5px;
+}
+
+
+/* LOADING */
+
+.loading {
+    grid-column: 1/-1;
+
+    text-align: center;
+
+    padding: 50px;
+
+    color: #999;
+}
+
+
+/* ERROR */
+
+.error {
+    background: #211015;
+
+    border: 1px solid #55232b;
+
+    color: #ffb5bc;
+
+    border-radius: 10px;
+
+    padding: 25px;
+
+    text-align: center;
+}
+
+
+/* FOOTER */
+
+footer {
+    border-top: 1px solid #1c1e27;
+
+    padding: 35px 5%;
+
+    text-align: center;
+
+    color: #666;
+
+    font-size: 13px;
+}
+
+
+/* MOBILE */
+
+@media(max-width:700px) {
+
+    header {
+        height: 60px;
+
+        padding: 0 18px;
+
+        gap: 12px;
+    }
+
+    nav {
+        display: none;
+    }
+
+    .logo {
+        font-size: 21px;
+    }
+
+    .search {
+        width: 100%;
+
+        max-width: 180px;
+
+        padding: 9px 13px;
+    }
+
+    .hero {
+        min-height: 450px;
+
+        padding: 35px 20px;
+    }
+
+    .hero h1 {
+        font-size: 42px;
+    }
+
+    main {
+        width: 94%;
+
+        padding-top: 30px;
+    }
+
+    .movies {
+        grid-template-columns:
+            repeat(2,1fr);
+
+        gap: 12px;
+    }
+
+    .movie-info {
+        padding: 18px;
+    }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <div class="logo">
+        MOVIE<span>ZONE</span>
+    </div>
+
+
+    <nav>
+
+        <a href="#inicio">
+            Inicio
+        </a>
+
+        <a href="#peliculas">
+            Películas
+        </a>
+
+        <a href="#series">
+            Series
+        </a>
+
+        <a href="#anime">
+            Anime
+        </a>
+
+        <a href="#reproductor">
+            Reproductor
+        </a>
+
+    </nav>
+
+
+    <input
+        id="search"
+        class="search"
+        type="search"
+        placeholder="Buscar películas, series..."
+        autocomplete="off"
+    >
+
+</header>
+
+
+<!-- HERO -->
+
+<section
+    class="hero"
+    id="inicio"
+>
+
+    <div class="hero-content">
+
+        <div class="badge">
+            MOVIEZONE
+        </div>
+
+        <h1>
+            Tu entretenimiento,
+            en un solo lugar.
+        </h1>
+
+        <p>
+            Explora películas, series y anime.
+            Selecciona un título para consultar
+            su información y, cuando corresponda,
+            sus episodios.
+        </p>
+
+        <div class="hero-buttons">
+
+            <a
+                href="#peliculas"
+                class="watch"
+            >
+                ▶ Explorar catálogo
+            </a>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<main>
+
+
+<!-- ==================================================
+     REPRODUCTOR
+================================================== -->
+
+<section
+    class="section"
+    id="reproductor"
+>
+
+    <div class="section-title">
+
+        <h2 id="player-title">
+            Reproductor
+        </h2>
+
+        <span>
+            Selecciona un contenido
+        </span>
+
+    </div>
+
+
+    <div class="player-container">
+
+        <div class="player">
+
+            <iframe
+                id="player"
+                src="about:blank"
+                title="Reproductor"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ==================================================
+     INFORMACIÓN
+================================================== -->
+
+<section
+    class="movie-info"
+    id="informacion"
+>
+
+    <h2 id="info-title">
+        Selecciona una película, serie o anime
+    </h2>
+
+
+    <p id="info-description">
+        Selecciona un contenido del catálogo
+        para consultar su información.
+    </p>
+
+
+    <div
+        class="tags"
+        id="info-tags"
+    ></div>
+
+</section>
+
+
+<!-- ==================================================
+     EPISODIOS
+================================================== -->
+
+<section
+    class="section"
+    id="episodios-section"
+    style="display:none;"
+>
+
+    <div class="section-title">
+
+        <h2>
+            Episodios
+        </h2>
+
+        <span id="episodios-count">
+            0 episodios
+        </span>
+
+    </div>
+
+
+    <div
+        class="episodes"
+        id="episodios-lista"
+    ></div>
+
+</section>
+
+
+<!-- ==================================================
+     PELÍCULAS
+================================================== -->
+
+<section
+    class="section"
+    id="peliculas"
+>
+
+    <div class="section-title">
+
+        <h2>
+            Películas
+        </h2>
+
+        <span id="peliculas-count">
+            Cargando...
+        </span>
+
+    </div>
+
+
+    <div
+        class="movies"
+        id="peliculas-container"
+    >
+
+        <div class="loading">
+            Cargando películas...
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ==================================================
+     SERIES
+================================================== -->
+
+<section
+    class="section"
+    id="series"
+>
+
+    <div class="section-title">
+
+        <h2>
+            Series
+        </h2>
+
+        <span id="series-count">
+            Cargando...
+        </span>
+
+    </div>
+
+
+    <div
+        class="movies"
+        id="series-container"
+    >
+
+        <div class="loading">
+            Cargando series...
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ==================================================
+     ANIME
+================================================== -->
+
+<section
+    class="section"
+    id="anime"
+>
+
+    <div class="section-title">
+
+        <h2>
+            Anime
+        </h2>
+
+        <span id="anime-count">
+            Cargando...
+        </span>
+
+    </div>
+
+
+    <div
+        class="movies"
+        id="anime-container"
+    >
+
+        <div class="loading">
+            Cargando anime...
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ==================================================
+     RESULTADOS DE BÚSQUEDA
+================================================== -->
+
+<section
+    class="section"
+    id="busqueda-section"
+    style="display:none;"
+>
+
+    <div class="section-title">
+
+        <h2>
+            Resultados
+        </h2>
+
+        <span id="busqueda-count">
+            0 resultados
+        </span>
+
+    </div>
+
+
+    <div
+        class="movies"
+        id="busqueda-container"
+    ></div>
+
+</section>
+
+
+</main>
+
+
+<footer>
+
+    © 2026 MovieZone ·
+    Catálogo dinámico
+
+</footer>
+
+
+<script src="/app.js"></script>
+
+</body>
+
+</html>
