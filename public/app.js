@@ -3,298 +3,288 @@ const moviesContainer =
         "movies-container"
     );
 
+const peliculasContainer =
+    document.getElementById(
+        "peliculas-container"
+    );
+
+const seriesContainer =
+    document.getElementById(
+        "series-container"
+    );
+
+const animesContainer =
+    document.getElementById(
+        "animes-container"
+    );
+
+
 const searchInput =
     document.getElementById(
         "search"
     );
+
 
 const resultadoInfo =
     document.getElementById(
         "resultado-info"
     );
 
-const sectionTitle =
+
+const peliculasInfo =
     document.getElementById(
-        "section-title"
+        "peliculas-info"
     );
 
-const player =
+
+const seriesInfo =
     document.getElementById(
-        "player"
+        "series-info"
     );
+
+
+const animesInfo =
+    document.getElementById(
+        "animes-info"
+    );
+
+
+const playerWrapper =
+    document.getElementById(
+        "player-wrapper"
+    );
+
 
 const playerTitle =
     document.getElementById(
         "player-title"
     );
 
+
+const playerMessage =
+    document.getElementById(
+        "player-message"
+    );
+
+
 const infoTitle =
     document.getElementById(
         "info-title"
     );
+
 
 const infoDescription =
     document.getElementById(
         "info-description"
     );
 
+
 const infoTags =
     document.getElementById(
         "info-tags"
     );
 
-const videoStatus =
+
+const heroTitle =
     document.getElementById(
-        "video-status"
+        "hero-title"
     );
 
-const episodesSection =
-    document.getElementById(
-        "episodes-section"
-    );
 
-const episodesList =
+const heroDescription =
     document.getElementById(
-        "episodes-list"
-    );
-
-const episodesCount =
-    document.getElementById(
-        "episodes-count"
+        "hero-description"
     );
 
 
 let catalogo = [];
 
-let seccionActual =
-    "inicio";
+let peliculas = [];
+
+let series = [];
+
+let animes = [];
 
 let seleccionActual = null;
 
 
 // ======================================================
-// DETERMINAR SECCIÓN
+// IMAGEN DE RESPALDO
 // ======================================================
 
-function obtenerSeccion() {
+const PLACEHOLDER =
+    "data:image/svg+xml;charset=UTF-8," +
+    encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg"
+             width="300"
+             height="450"
+             viewBox="0 0 300 450">
 
-    const ruta =
-        window.location.pathname
-            .toLowerCase();
+            <rect width="300"
+                  height="450"
+                  fill="#171922"/>
 
+            <text
+                x="150"
+                y="210"
+                fill="#777"
+                font-size="18"
+                text-anchor="middle"
+                font-family="Arial">
+                SIN PORTADA
+            </text>
 
-    if (
-        ruta.startsWith(
-            "/peliculas"
-        )
-    ) {
+            <text
+                x="150"
+                y="240"
+                fill="#555"
+                font-size="12"
+                text-anchor="middle"
+                font-family="Arial">
+                MovieZone
+            </text>
 
-        return "peliculas";
-
-    }
-
-
-    if (
-        ruta.startsWith(
-            "/series"
-        )
-    ) {
-
-        return "series";
-
-    }
-
-
-    if (
-        ruta.startsWith(
-            "/animes"
-        )
-    ) {
-
-        return "animes";
-
-    }
-
-
-    return "inicio";
-}
-
-
-// ======================================================
-// TÍTULO
-// ======================================================
-
-function tituloSeccion(tipo) {
-
-    if (tipo === "peliculas") {
-        return "Películas";
-    }
-
-    if (tipo === "series") {
-        return "Series";
-    }
-
-    if (tipo === "animes") {
-        return "Anime";
-    }
-
-    return "Recomendaciones";
-}
+        </svg>
+    `);
 
 
 // ======================================================
 // CARGAR CATÁLOGO
 // ======================================================
 
-async function cargarCatalogo(tipo) {
-
-    seccionActual =
-        tipo;
-
-
-    sectionTitle.textContent =
-        tituloSeccion(tipo);
-
-
-    moviesContainer.innerHTML = `
-        <div class="loading">
-            Cargando ${tipo === "inicio"
-                ? "recomendaciones"
-                : tituloSeccion(tipo).toLowerCase()
-            }...
-        </div>
-    `;
-
+async function cargarCatalogo() {
 
     try {
 
-        let resultados = [];
+        mostrarCarga(
+            moviesContainer,
+            "Cargando recomendaciones..."
+        );
 
 
-        // ==================================================
-        // INICIO
-        // ==================================================
-
-        if (tipo === "inicio") {
-
-            /*
-             * En inicio cargamos una pequeña
-             * muestra de cada categoría.
-             */
-
-            const tipos = [
-                "peliculas",
-                "series",
-                "animes"
-            ];
+        const respuesta =
+            await fetch(
+                "/api/catalogo",
+                {
+                    cache: "no-store"
+                }
+            );
 
 
-            for (
-                const categoria
-                of tipos
-            ) {
+        if (!respuesta.ok) {
 
-                try {
-
-                    const respuesta =
-                        await fetch(
-                            `/api/catalogo?tipo=${categoria}`,
-                            {
-                                cache:
-                                    "no-store"
-                            }
-                        );
-
-
-                    if (!respuesta.ok) {
-                        continue;
-                    }
-
-
-                    const datos =
-                        await respuesta.json();
-
-
-                    if (
-                        Array.isArray(
-                            datos.resultados
-                        )
-                    ) {
-
-                        resultados.push(
-                            ...datos.resultados
-                                .slice(0, 6)
-                        );
-
-                    }
-
-                } catch {}
-
-            }
-
-        } else {
-
-            const respuesta =
-                await fetch(
-                    `/api/catalogo?tipo=${tipo}`,
-                    {
-                        cache:
-                            "no-store"
-                    }
-                );
-
-
-            if (!respuesta.ok) {
-
-                throw new Error(
-                    `HTTP ${respuesta.status}`
-                );
-
-            }
-
-
-            const datos =
-                await respuesta.json();
-
-
-            resultados =
-                Array.isArray(
-                    datos.resultados
-                )
-                    ? datos.resultados
-                    : [];
-
+            throw new Error(
+                `HTTP ${respuesta.status}`
+            );
         }
 
 
-        catalogo =
-            resultados;
+        const data =
+            await respuesta.json();
+
+
+        peliculas =
+            Array.isArray(
+                data.peliculas
+            )
+                ? data.peliculas
+                : [];
+
+
+        series =
+            Array.isArray(
+                data.series
+            )
+                ? data.series
+                : [];
+
+
+        animes =
+            Array.isArray(
+                data.animes
+            )
+                ? data.animes
+                : [];
+
+
+        catalogo = [
+
+            ...peliculas,
+
+            ...series,
+
+            ...animes
+
+        ];
 
 
         mostrarCatalogo(
-            resultados
+            catalogo.slice(0, 18),
+            moviesContainer
         );
+
+
+        mostrarCatalogo(
+            peliculas,
+            peliculasContainer
+        );
+
+
+        mostrarCatalogo(
+            series,
+            seriesContainer
+        );
+
+
+        mostrarCatalogo(
+            animes,
+            animesContainer
+        );
+
+
+        resultadoInfo.textContent =
+            `${catalogo.length} disponibles`;
+
+
+        peliculasInfo.textContent =
+            `${peliculas.length} disponibles`;
+
+
+        seriesInfo.textContent =
+            `${series.length} disponibles`;
+
+
+        animesInfo.textContent =
+            `${animes.length} disponibles`;
 
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
 
 
-        moviesContainer.innerHTML = `
-            <div class="loading">
-                No se pudo cargar el contenido.
-                <br><br>
-                <small>
-                    ${escapeHtml(
-                        error.message
-                    )}
-                </small>
-            </div>
-        `;
+        mostrarError(
+            moviesContainer,
+            error
+        );
 
+        mostrarError(
+            peliculasContainer,
+            error
+        );
+
+        mostrarError(
+            seriesContainer,
+            error
+        );
+
+        mostrarError(
+            animesContainer,
+            error
+        );
     }
-
 }
 
 
@@ -302,31 +292,32 @@ async function cargarCatalogo(tipo) {
 // MOSTRAR CATÁLOGO
 // ======================================================
 
-function mostrarCatalogo(lista) {
+function mostrarCatalogo(
+    lista,
+    container
+) {
 
-    moviesContainer.innerHTML = "";
+    container.innerHTML = "";
 
 
-    if (!lista.length) {
+    if (
+        !Array.isArray(lista) ||
+        !lista.length
+    ) {
 
-        moviesContainer.innerHTML = `
-            <div class="loading">
-                No se encontraron contenidos.
+        container.innerHTML = `
+
+            <div class="empty">
+
+                No hay contenido
+                disponible por el momento.
+
             </div>
+
         `;
 
-
-        resultadoInfo.textContent =
-            "0 resultados";
-
-
         return;
-
     }
-
-
-    resultadoInfo.textContent =
-        `${lista.length} resultados`;
 
 
     lista.forEach(
@@ -344,9 +335,7 @@ function mostrarCatalogo(lista) {
 
             const portada =
                 item.portada ||
-                crearPortadaAlternativa(
-                    item.nombre
-                );
+                PLACEHOLDER;
 
 
             const nombre =
@@ -362,12 +351,8 @@ function mostrarCatalogo(lista) {
             card.innerHTML = `
 
                 <img
-                    src="${escapeAttribute(
-                        portada
-                    )}"
-                    alt="${escapeAttribute(
-                        nombre
-                    )}"
+                    src="${escapeAttribute(portada)}"
+                    alt="${escapeAttribute(nombre)}"
                     loading="lazy"
                 >
 
@@ -376,18 +361,15 @@ function mostrarCatalogo(lista) {
                 >
 
                     <h3>
-                        ${escapeHtml(
-                            nombre
-                        )}
+                        ${escapeHtml(nombre)}
                     </h3>
 
                     <span>
-                        ${escapeHtml(
-                            tipo
-                        )}
+                        ${escapeHtml(tipo)}
                     </span>
 
                 </div>
+
             `;
 
 
@@ -401,14 +383,14 @@ function mostrarCatalogo(lista) {
                 "error",
                 () => {
 
-                    imagen.src =
-                        crearPortadaAlternativa(
-                            nombre
-                        );
+                    if (
+                        imagen.src !==
+                        PLACEHOLDER
+                    ) {
 
-                },
-                {
-                    once: true
+                        imagen.src =
+                            PLACEHOLDER;
+                    }
                 }
             );
 
@@ -417,44 +399,18 @@ function mostrarCatalogo(lista) {
                 "click",
                 () => {
 
-                    seleccionar(item);
-
+                    seleccionar(
+                        item
+                    );
                 }
             );
 
 
-            moviesContainer.appendChild(
+            container.appendChild(
                 card
             );
-
         }
     );
-
-}
-
-
-// ======================================================
-// PORTADA ALTERNATIVA
-// ======================================================
-
-function crearPortadaAlternativa(
-    nombre
-) {
-
-    const texto =
-        encodeURIComponent(
-            String(
-                nombre ||
-                "MovieZone"
-            ).substring(0, 35)
-        );
-
-
-    return (
-        "https://placehold.co/600x900/11131a/ffffff" +
-        `?text=${texto}`
-    );
-
 }
 
 
@@ -462,7 +418,9 @@ function crearPortadaAlternativa(
 // SELECCIONAR
 // ======================================================
 
-function seleccionar(item) {
+function seleccionar(
+    item
+) {
 
     seleccionActual =
         item;
@@ -471,6 +429,15 @@ function seleccionar(item) {
     const nombre =
         item.nombre ||
         "Sin título";
+
+
+    heroTitle.textContent =
+        nombre;
+
+
+    heroDescription.textContent =
+        item.descripcion ||
+        "Información disponible en el catálogo.";
 
 
     playerTitle.textContent =
@@ -486,75 +453,61 @@ function seleccionar(item) {
         "Sin descripción disponible.";
 
 
+    // --------------------------------------------------
+    // TAGS
+    // --------------------------------------------------
+
     infoTags.innerHTML = "";
 
 
-    agregarTag(
-        item.tipo ||
-        "Contenido"
-    );
-
-
-    if (item.year) {
+    if (item.tipo) {
 
         agregarTag(
-            item.year
+            item.tipo
         );
-
     }
 
 
-    if (item.genero) {
+    if (
+        item.episodios &&
+        item.episodios.length
+    ) {
 
         agregarTag(
-            item.genero
+            `${item.episodios.length} episodios`
         );
-
     }
 
 
-    // ==================================================
+    // --------------------------------------------------
     // REPRODUCTOR
-    // ==================================================
+    // --------------------------------------------------
 
-    videoStatus.innerHTML = "";
+    if (
+        item.reproductor
+    ) {
 
+        reproducir(
+            item.reproductor
+        );
 
-    if (item.video) {
+    } else if (
+        item.video
+    ) {
 
         reproducir(
             item.video
         );
 
-
-        videoStatus.innerHTML = `
-            <div
-                class="tag"
-                style="margin-top:15px;"
-            >
-                Reproductor disponible
-            </div>
-        `;
-
     } else {
 
-        player.src =
-            "about:blank";
-
-
-        videoStatus.innerHTML = `
-            <div class="no-video">
-                Sin reproductor disponible
-                por el momento.
-            </div>
-        `;
-
+        mostrarSinReproductor();
     }
 
 
-    // ==================================================
+    // --------------------------------------------------
     // EPISODIOS
-    // ==================================================
+    // --------------------------------------------------
 
     mostrarEpisodios(
         item
@@ -568,29 +521,90 @@ function seleccionar(item) {
         .scrollIntoView({
             behavior: "smooth"
         });
-
 }
 
 
 // ======================================================
-// REPRODUCIR
+// REPRODUCTOR
 // ======================================================
 
-function reproducir(url) {
+function reproducir(
+    url
+) {
 
     if (!url) {
 
-        player.src =
-            "about:blank";
+        mostrarSinReproductor();
 
         return;
-
     }
 
 
-    player.src =
+    playerWrapper.innerHTML = "";
+
+
+    const iframe =
+        document.createElement(
+            "iframe"
+        );
+
+
+    iframe.id =
+        "player";
+
+
+    iframe.src =
         url;
 
+
+    iframe.title =
+        "Reproductor";
+
+
+    iframe.allow =
+        "autoplay; fullscreen; picture-in-picture";
+
+
+    iframe.allowFullscreen =
+        true;
+
+
+    playerWrapper.appendChild(
+        iframe
+    );
+}
+
+
+// ======================================================
+// SIN REPRODUCTOR
+// ======================================================
+
+function mostrarSinReproductor() {
+
+    playerWrapper.innerHTML = `
+
+        <div
+            class="player-message"
+        >
+
+            <div>
+
+                <strong>
+                    Sin reproductor disponible
+                    por el momento
+                </strong>
+
+                <br><br>
+
+                Este contenido todavía
+                no tiene un reproductor
+                disponible.
+
+            </div>
+
+        </div>
+
+    `;
 }
 
 
@@ -598,38 +612,88 @@ function reproducir(url) {
 // EPISODIOS
 // ======================================================
 
-function mostrarEpisodios(item) {
+function mostrarEpisodios(
+    item
+) {
 
-    episodesList.innerHTML = "";
-
-
-    const episodios =
-        Array.isArray(
-            item.episodios
-        )
-            ? item.episodios
-            : [];
+    const anterior =
+        document.getElementById(
+            "episodios"
+        );
 
 
-    if (!episodios.length) {
+    if (anterior) {
 
-        episodesSection.style.display =
-            "none";
-
-        return;
-
+        anterior.remove();
     }
 
 
-    episodesSection.style.display =
-        "block";
+    if (
+        !Array.isArray(
+            item.episodios
+        ) ||
+        !item.episodios.length
+    ) {
+
+        return;
+    }
 
 
-    episodesCount.textContent =
-        `${episodios.length} episodios`;
+    const section =
+        document.createElement(
+            "section"
+        );
 
 
-    episodios.forEach(
+    section.id =
+        "episodios";
+
+
+    section.className =
+        "episodes-section";
+
+
+    section.innerHTML = `
+
+        <div
+            class="section-title"
+        >
+
+            <h2>
+                Episodios
+            </h2>
+
+            <span>
+                ${item.episodios.length}
+                disponibles
+            </span>
+
+        </div>
+
+
+        <div
+            class="episodes-list"
+        ></div>
+
+    `;
+
+
+    document
+        .querySelector(
+            ".movie-info"
+        )
+        .after(
+            section
+        );
+
+
+    const lista =
+        section.querySelector(
+            ".episodes-list"
+        );
+
+
+    item.episodios.forEach(
         (episodio, index) => {
 
             const boton =
@@ -638,77 +702,55 @@ function mostrarEpisodios(item) {
                 );
 
 
+            const nombre =
+                episodio.nombre ||
+                `Episodio ${
+                    index + 1
+                }`;
+
+
+            boton.textContent =
+                nombre;
+
+
             boton.className =
-                "episode";
+                "episode-button";
 
 
-            boton.innerHTML = `
+            if (
+                !episodio.video
+            ) {
 
-                <strong>
-                    ${escapeHtml(
-                        episodio.nombre ||
-                        `Episodio ${
-                            index + 1
-                        }`
-                    )}
-                </strong>
+                boton.classList.add(
+                    "disabled"
+                );
 
-                <small>
-                    ${
-                        episodio.video
-                            ? "Disponible"
-                            : "Sin reproductor"
-                    }
-                </small>
 
-            `;
+                boton.title =
+                    "Sin reproductor disponible";
+
+            }
 
 
             boton.addEventListener(
                 "click",
                 () => {
 
-                    playerTitle.textContent =
-                        `${item.nombre} - ${
-                            episodio.nombre ||
-                            `Episodio ${
-                                index + 1
-                            }`
-                        }`;
-
-
                     if (
-                        episodio.video
+                        !episodio.video
                     ) {
 
-                        reproducir(
-                            episodio.video
-                        );
-
-
-                        videoStatus.innerHTML = `
-                            <div
-                                class="tag"
-                                style="margin-top:15px;"
-                            >
-                                Reproductor disponible
-                            </div>
-                        `;
-
-                    } else {
-
-                        player.src =
-                            "about:blank";
-
-
-                        videoStatus.innerHTML = `
-                            <div class="no-video">
-                                Sin reproductor disponible
-                                por el momento.
-                            </div>
-                        `;
-
+                        return;
                     }
+
+
+                    reproducir(
+                        episodio.video
+                    );
+
+
+                    playerTitle.textContent =
+                        `${item.nombre} - ${nombre}`;
 
 
                     document
@@ -724,13 +766,11 @@ function mostrarEpisodios(item) {
             );
 
 
-            episodesList.appendChild(
+            lista.appendChild(
                 boton
             );
-
         }
     );
-
 }
 
 
@@ -738,12 +778,9 @@ function mostrarEpisodios(item) {
 // TAG
 // ======================================================
 
-function agregarTag(texto) {
-
-    if (!texto) {
-        return;
-    }
-
+function agregarTag(
+    texto
+) {
 
     const tag =
         document.createElement(
@@ -762,7 +799,6 @@ function agregarTag(texto) {
     infoTags.appendChild(
         tag
     );
-
 }
 
 
@@ -770,35 +806,44 @@ function agregarTag(texto) {
 // BÚSQUEDA
 // ======================================================
 
-let timeoutBusqueda = null;
+let temporizadorBusqueda =
+    null;
 
 
 searchInput.addEventListener(
     "input",
     () => {
 
-        clearTimeout(
-            timeoutBusqueda
-        );
-
-
         const texto =
             searchInput.value
                 .trim();
 
 
+        clearTimeout(
+            temporizadorBusqueda
+        );
+
+
         if (!texto) {
 
             mostrarCatalogo(
-                catalogo
+                catalogo.slice(
+                    0,
+                    18
+                ),
+                moviesContainer
             );
 
-            return;
 
+            resultadoInfo.textContent =
+                `${catalogo.length} disponibles`;
+
+
+            return;
         }
 
 
-        timeoutBusqueda =
+        temporizadorBusqueda =
             setTimeout(
                 () => {
 
@@ -809,32 +854,38 @@ searchInput.addEventListener(
                 },
                 400
             );
-
     }
 );
 
 
 // ======================================================
-// BUSCAR EN SERVIDOR
+// BÚSQUEDA API
 // ======================================================
 
-async function buscar(texto) {
-
-    moviesContainer.innerHTML = `
-        <div class="loading">
-            Buscando...
-        </div>
-    `;
-
+async function buscar(
+    texto
+) {
 
     try {
+
+        moviesContainer.innerHTML = `
+
+            <div class="loading">
+
+                Buscando
+                <strong>
+                    ${escapeHtml(texto)}
+                </strong>...
+
+            </div>
+
+        `;
+
 
         const respuesta =
             await fetch(
                 `/api/buscar?q=${
-                    encodeURIComponent(
-                        texto
-                    )
+                    encodeURIComponent(texto)
                 }`,
                 {
                     cache:
@@ -848,44 +899,43 @@ async function buscar(texto) {
             throw new Error(
                 `HTTP ${respuesta.status}`
             );
-
         }
 
 
-        const datos =
+        const data =
             await respuesta.json();
 
 
         const resultados =
             Array.isArray(
-                datos.resultados
+                data.resultados
             )
-                ? datos.resultados
+                ? data.resultados
                 : [];
+
+
+        mostrarCatalogo(
+            resultados,
+            moviesContainer
+        );
 
 
         resultadoInfo.textContent =
             `${resultados.length} resultados`;
 
 
-        mostrarCatalogo(
-            resultados
+    } catch (error) {
+
+        console.error(
+            error
         );
 
 
-    } catch (error) {
-
-        console.error(error);
-
-
-        moviesContainer.innerHTML = `
-            <div class="loading">
-                Error al buscar.
-            </div>
-        `;
-
+        mostrarError(
+            moviesContainer,
+            error
+        );
     }
-
 }
 
 
@@ -895,7 +945,7 @@ async function buscar(texto) {
 
 document
     .querySelectorAll(
-        "nav a"
+        "nav a[data-section]"
     )
     .forEach(
         enlace => {
@@ -904,118 +954,118 @@ document
                 "click",
                 event => {
 
+                    const seccion =
+                        enlace.dataset
+                            .section;
+
+
+                    if (
+                        seccion ===
+                        "inicio"
+                    ) {
+
+                        return;
+                    }
+
+
                     event.preventDefault();
 
 
                     const destino =
-                        enlace.getAttribute(
-                            "href"
+                        document.getElementById(
+                            `seccion-${seccion}`
                         );
 
 
-                    history.pushState(
-                        {},
-                        "",
-                        destino
-                    );
+                    if (destino) {
 
-
-                    cargarRuta();
-
+                        destino.scrollIntoView({
+                            behavior:
+                                "smooth"
+                        });
+                    }
                 }
             );
-
         }
     );
 
 
 // ======================================================
-// CARGAR RUTA
+// ERRORES
 // ======================================================
 
-function cargarRuta() {
+function mostrarCarga(
+    container,
+    texto
+) {
 
-    const tipo =
-        obtenerSeccion();
+    container.innerHTML = `
 
+        <div class="loading">
+            ${escapeHtml(texto)}
+        </div>
 
-    document
-        .querySelectorAll(
-            "nav a"
-        )
-        .forEach(
-            enlace => {
-
-                const ruta =
-                    enlace.dataset.route;
-
-
-                enlace.classList.toggle(
-                    "active",
-                    ruta === tipo
-                );
-
-            }
-        );
-
-
-    searchInput.value = "";
-
-
-    cargarCatalogo(
-        tipo
-    );
-
+    `;
 }
 
 
-// ======================================================
-// HISTORIAL
-// ======================================================
+function mostrarError(
+    container,
+    error
+) {
 
-window.addEventListener(
-    "popstate",
-    () => {
+    container.innerHTML = `
 
-        cargarRuta();
+        <div class="empty">
 
-    }
-);
+            No se pudo cargar
+            el contenido.
+
+            <br><br>
+
+            <small>
+                ${escapeHtml(
+                    error.message
+                )}
+            </small>
+
+        </div>
+
+    `;
+}
 
 
 // ======================================================
 // SEGURIDAD
 // ======================================================
 
-function escapeHtml(texto) {
+function escapeHtml(
+    texto
+) {
 
-    return String(texto)
-
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
-
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
-
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
-
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
-
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
-
+    return String(
+        texto ?? ""
+    )
+    .replaceAll(
+        "&",
+        "&amp;"
+    )
+    .replaceAll(
+        "<",
+        "&lt;"
+    )
+    .replaceAll(
+        ">",
+        "&gt;"
+    )
+    .replaceAll(
+        '"',
+        "&quot;"
+    )
+    .replaceAll(
+        "'",
+        "&#039;"
+    );
 }
 
 
@@ -1026,7 +1076,6 @@ function escapeAttribute(
     return escapeHtml(
         texto
     );
-
 }
 
 
@@ -1034,4 +1083,4 @@ function escapeAttribute(
 // INICIAR
 // ======================================================
 
-cargarRuta();
+cargarCatalogo();
