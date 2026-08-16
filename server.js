@@ -7,11 +7,18 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 
-const BASE = process.env.SOURCE_URL || "https://www.hackstore.fo";
+// ======================================================
+// CONFIGURACIÓN
+// ======================================================
+
+const BASE =
+    process.env.SOURCE_URL ||
+    "https://www.hackstore.fo";
 
 const HEADERS = {
     "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36",
+
     "Accept":
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 };
@@ -28,16 +35,20 @@ const session = axios.create({
 // ======================================================
 
 function unirUrl(base, relativa) {
+
     try {
         return new URL(relativa, base).toString();
     } catch {
         return null;
     }
+
 }
 
 
 function limpiarUrl(urlStr) {
+
     try {
+
         const p = new URL(urlStr);
 
         let pathname = p.pathname;
@@ -47,230 +58,55 @@ function limpiarUrl(urlStr) {
         }
 
         return `${p.protocol}//${p.host}${pathname}`;
+
     } catch {
+
         return urlStr;
+
     }
+
+}
+
+
+async function obtenerHTML(url) {
+
+    const respuesta = await session.get(url);
+
+    return respuesta.data || "";
+
 }
 
 
 async function obtener(url) {
-    const respuesta = await session.get(url);
-    return cheerio.load(respuesta.data);
+
+    const html = await obtenerHTML(url);
+
+    return cheerio.load(html);
+
 }
 
 
 // ======================================================
-// PORTADA
+// DETECTAR TIPO
 // ======================================================
 
-function extraerPortada($, link) {
+function detectarTipo(url, nombre = "") {
 
-    let portada = null;
+    const texto =
+        `${url} ${nombre}`.toLowerCase();
 
-    // JSON-LD
-    $('script[type="application/ld+json"]').each((_, script) => {
-
-        if (portada) return;
-
-        try {
-
-            const raw = $(script).html();
-
-            if (!raw) return;
-
-            const data = JSON.parse(raw);
-
-            let objetos = [];
-
-            if (Array.isArray(data)) {
-                objetos = data;
-            }
-
-            else if (
-                data &&
-                typeof data === "object"
-            ) {
-                objetos = data["@graph"] || [data];
-            }
-
-            for (const obj of objetos) {
-
-                if (!obj || typeof obj !== "object") {
-                    continue;
-                }
-
-                if (obj["@type"] === "ImageObject") {
-
-                    portada =
-                        obj.contentUrl ||
-                        obj.url ||
-                        null;
-                }
-
-                if (!portada) {
-
-                    if (typeof obj.image === "string") {
-                        portada = obj.image;
-                    }
-
-                    else if (
-                        obj.image &&
-                        typeof obj.image === "object"
-                    ) {
-                        portada =
-                            obj.image.url ||
-                            obj.image.contentUrl ||
-                            null;
-                    }
-                }
-
-                if (!portada) {
-                    portada =
-                        obj.thumbnailUrl ||
-                        null;
-                }
-
-                if (portada) break;
-            }
-
-        } catch {}
-    });
-
-
-    // OG IMAGE
-    if (!portada) {
-
-        const og =
-            $('meta[property="og:image"]')
-                .attr("content");
-
-        if (og) {
-            portada = og;
-        }
-    }
-
-
-    // Twitter image
-    if (!portada) {
-
-        const twitter =
-            $('meta[name="twitter:image"]')
-                .attr("content");
-
-        if (twitter) {
-            portada = twitter;
-        }
-    }
-
-
-    if (portada) {
-        portada = unirUrl(link, portada);
-    }
-
-    return portada;
-}
-
-
-// ======================================================
-// NOMBRE
-// ======================================================
-
-function extraerNombre($) {
-
-    let nombre = null;
-
-    const h1 = $("h1").first();
-
-    if (h1.length) {
-
-        nombre =
-            h1.text()
-                .trim()
-                .replace(/\s+/g, " ");
-    }
-
-
-    if (!nombre) {
-
-        const og =
-            $('meta[property="og:title"]')
-                .attr("content");
-
-        if (og) {
-            nombre =
-                og
-                    .replace(/\s+/g, " ")
-                    .trim();
-        }
-    }
-
-
-    if (!nombre) {
-
-        const title =
-            $("title")
-                .first()
-                .text()
-                .trim();
-
-        if (title) {
-            nombre = title;
-        }
-    }
-
-
-    // Evitar que aparezca el título genérico
     if (
-        nombre &&
-        /descargar peliculas gratis/i.test(nombre)
+        texto.includes("/anime/") ||
+        texto.includes("/animes/") ||
+        texto.includes("anime")
     ) {
-        nombre = null;
-    }
-
-
-    return nombre;
-}
-
-
-// ======================================================
-// DESCRIPCIÓN
-// ======================================================
-
-function extraerDescripcion($) {
-
-    const og =
-        $('meta[property="og:description"]')
-            .attr("content");
-
-    if (og) {
-        return og.trim();
-    }
-
-    const meta =
-        $('meta[name="description"]')
-            .attr("content");
-
-    if (meta) {
-        return meta.trim();
-    }
-
-    return "";
-}
-
-
-// ======================================================
-// TIPO
-// ======================================================
-
-function detectarTipo(link) {
-
-    const url = link.toLowerCase();
-
-    if (url.includes("/anime/") || url.includes("/animes/")) {
         return "Anime";
     }
 
-    if (url.includes("/series/")) {
+    if (
+        texto.includes("/series/") ||
+        texto.includes("serie")
+    ) {
         return "Serie";
     }
 
@@ -279,261 +115,219 @@ function detectarTipo(link) {
 
 
 // ======================================================
-// REPRODUCTOR
+// OBTENER PORTADA
 // ======================================================
 
-function extraerReproductor($, link) {
+function extraerPortada($, paginaUrl) {
 
-    let reproductor = null;
-
-    $("iframe[src]").each((_, iframe) => {
-
-        if (reproductor) return;
-
-        const src = $(iframe).attr("src");
-
-        if (!src) return;
-
-        const url = unirUrl(link, src);
-
-        if (!url) return;
-
-        /*
-         * Conservamos el iframe encontrado.
-         * No dependemos de que tenga un nombre
-         * concreto.
-         */
-
-        reproductor = url;
-    });
+    let portada = null;
 
 
-    // También buscar embeds en objetos/video
-    if (!reproductor) {
+    // ==================================================
+    // JSON-LD
+    // ==================================================
 
-        $("embed[src], video[src]").each((_, elemento) => {
+    $('script[type="application/ld+json"]').each(
+        (_, script) => {
 
-            if (reproductor) return;
+            if (portada) return;
 
-            const src = $(elemento).attr("src");
+            try {
 
-            if (!src) return;
+                const raw = $(script).html();
 
-            reproductor =
-                unirUrl(link, src);
-        });
-    }
+                if (!raw) return;
 
+                const data = JSON.parse(raw);
 
-    return reproductor;
-}
+                let objetos = [];
 
+                if (Array.isArray(data)) {
 
-// ======================================================
-// EPISODIOS
-// ======================================================
+                    objetos = data;
 
-function extraerEpisodios($, link) {
+                } else if (
+                    data &&
+                    typeof data === "object"
+                ) {
 
-    const episodios = [];
+                    objetos =
+                        data["@graph"] ||
+                        [data];
 
-    const vistos = new Set();
-
-    $("a[href]").each((_, elemento) => {
-
-        const href =
-            $(elemento).attr("href");
-
-        if (!href) return;
-
-        const url =
-            unirUrl(link, href);
-
-        if (!url) return;
+                }
 
 
-        const texto =
-            $(elemento)
-                .text()
-                .replace(/\s+/g, " ")
-                .trim();
+                for (const obj of objetos) {
+
+                    if (
+                        !obj ||
+                        typeof obj !== "object"
+                    ) {
+                        continue;
+                    }
 
 
-        const contenido =
-            `${texto} ${url}`;
+                    if (
+                        obj["@type"] ===
+                        "ImageObject"
+                    ) {
+
+                        portada =
+                            obj.contentUrl ||
+                            obj.url;
+
+                    }
 
 
-        /*
-         * Formatos habituales:
-         *
-         * Episodio 1
-         * Episodio 10
-         * 1x1
-         * 1x10
-         * Episode 1
-         * Capítulo 1
-         */
+                    if (!portada) {
 
-        const pareceEpisodio =
-            /episodio\s*\d+|episode\s*\d+|cap[ií]tulo\s*\d+|\b\d+x\d+\b|\bep\.?\s*\d+/i
-                .test(contenido);
+                        portada =
+                            obj.thumbnailUrl ||
+                            obj.image ||
+                            null;
+
+                    }
 
 
-        if (!pareceEpisodio) {
-            return;
-        }
+                    if (portada) {
+                        break;
+                    }
 
+                }
 
-        if (vistos.has(url)) {
-            return;
-        }
-
-
-        vistos.add(url);
-
-
-        let nombre =
-            texto ||
-            `Episodio ${episodios.length + 1}`;
-
-
-        /*
-         * Limpiar textos basura que algunas
-         * páginas meten junto al botón.
-         */
-
-        nombre =
-            nombre
-                .replace(/disponible/gi, "")
-                .replace(/\s+/g, " ")
-                .trim();
-
-
-        if (!nombre) {
-            nombre =
-                `Episodio ${episodios.length + 1}`;
-        }
-
-
-        episodios.push({
-
-            nombre,
-
-            link: url,
-
-            video: null
-
-        });
-
-    });
-
-
-    /*
-     * Ordenar por temporada/episodio cuando
-     * encontramos 1x1, 1x2, etc.
-     */
-
-    episodios.sort((a, b) => {
-
-        const obtenerNumero = texto => {
-
-            const m =
-                texto.match(
-                    /(\d+)\s*x\s*(\d+)/i
-                );
-
-            if (m) {
-                return (
-                    Number(m[1]) * 10000 +
-                    Number(m[2])
-                );
+            } catch {
+                // Ignorar JSON-LD inválido
             }
 
-            const e =
-                texto.match(/\d+/);
-
-            return e
-                ? Number(e[0])
-                : 999999;
-        };
+        }
+    );
 
 
-        return (
-            obtenerNumero(a.nombre) -
-            obtenerNumero(b.nombre)
-        );
-    });
+    // ==================================================
+    // OG IMAGE
+    // ==================================================
 
+    if (!portada) {
 
-    return episodios;
-}
+        portada =
+            $('meta[property="og:image"]')
+                .attr("content") ||
+            $('meta[name="twitter:image"]')
+                .attr("content") ||
+            null;
 
-
-// ======================================================
-// PROCESAR EPISODIO
-// ======================================================
-
-async function procesarEpisodio(episodio) {
-
-    try {
-
-        const $ =
-            await obtener(
-                episodio.link
-            );
-
-
-        const video =
-            extraerReproductor(
-                $,
-                episodio.link
-            );
-
-
-        return {
-
-            nombre:
-                episodio.nombre,
-
-            link:
-                episodio.link,
-
-            video:
-                video
-
-        };
-
-    } catch {
-
-        return {
-
-            nombre:
-                episodio.nombre,
-
-            link:
-                episodio.link,
-
-            video:
-                null
-
-        };
     }
+
+
+    // ==================================================
+    // IMG PRINCIPAL COMO ÚLTIMO RESPALDO
+    // ==================================================
+
+    if (!portada) {
+
+        const posibles = [
+            "img.wp-post-image",
+            ".poster img",
+            ".thumbnail img",
+            ".post-thumbnail img",
+            "article img"
+        ];
+
+        for (const selector of posibles) {
+
+            const src =
+                $(selector)
+                    .first()
+                    .attr("src");
+
+            if (src) {
+
+                portada = src;
+
+                break;
+            }
+
+        }
+
+    }
+
+
+    if (portada) {
+
+        portada =
+            unirUrl(
+                paginaUrl,
+                portada
+            );
+
+    }
+
+
+    return portada;
 }
 
 
 // ======================================================
-// PROCESAR ITEM
+// OBTENER NOMBRE
 // ======================================================
 
-async function procesarItem(link) {
+function extraerNombre($) {
 
-    const $ =
-        await obtener(link);
+    let nombre = null;
 
+
+    // H1
+    const h1 = $("h1").first();
+
+    if (h1.length) {
+
+        nombre =
+            h1.text()
+                .trim()
+                .replace(/\s+/g, " ");
+
+    }
+
+
+    // OG TITLE
+    if (!nombre) {
+
+        nombre =
+            $('meta[property="og:title"]')
+                .attr("content") ||
+            null;
+
+    }
+
+
+    // TITLE
+    if (!nombre) {
+
+        nombre =
+            $("title")
+                .first()
+                .text()
+                .trim() ||
+            null;
+
+    }
+
+
+    return nombre;
+}
+
+
+// ======================================================
+// PROCESAR UNA FICHA
+// ======================================================
+
+async function procesarPagina(link) {
+
+    const $ = await obtener(link);
 
     const nombre =
         extraerNombre($);
-
 
     const portada =
         extraerPortada(
@@ -541,61 +335,70 @@ async function procesarItem(link) {
             link
         );
 
-
     const descripcion =
-        extraerDescripcion($);
+        $('meta[property="og:description"]')
+            .attr("content") ||
+        "";
 
 
     const tipo =
-        detectarTipo(link);
-
-
-    const reproductor =
-        extraerReproductor(
-            $,
-            link
+        detectarTipo(
+            link,
+            nombre || ""
         );
 
 
-    let episodios = [];
+    // ==================================================
+    // BUSCAR REPRODUCTOR
+    // ==================================================
+
+    let reproductor = null;
 
 
-    if (
-        tipo === "Serie" ||
-        tipo === "Anime"
-    ) {
+    $("iframe[src]").each(
+        (_, iframe) => {
 
-        episodios =
-            extraerEpisodios(
-                $,
-                link
-            );
+            if (reproductor) return;
 
+            const src =
+                $(iframe).attr("src");
 
-        /*
-         * Obtener el reproductor de cada
-         * episodio.
-         */
+            if (!src) return;
 
-        const procesados = [];
-
-        for (
-            const episodio of episodios
-        ) {
-
-            const resultado =
-                await procesarEpisodio(
-                    episodio
+            const iframeUrl =
+                unirUrl(
+                    link,
+                    src
                 );
 
-            procesados.push(
-                resultado
-            );
-        }
+            if (!iframeUrl) return;
 
-        episodios =
-            procesados;
-    }
+
+            // Mantener el comportamiento
+            // de tu scraper original.
+
+            if (
+                iframeUrl.startsWith(BASE)
+            ) {
+
+                reproductor =
+                    iframeUrl;
+
+            }
+
+        }
+    );
+
+
+    // ==================================================
+    // EPISODIOS
+    // ==================================================
+
+    const episodios =
+        extraerEpisodios(
+            $,
+            link
+        );
 
 
     return {
@@ -608,8 +411,7 @@ async function procesarItem(link) {
             portada,
 
         descripcion:
-            descripcion ||
-            "Sin descripción disponible.",
+            descripcion.trim(),
 
         tipo,
 
@@ -620,21 +422,251 @@ async function procesarItem(link) {
         episodios
 
     };
+
 }
 
 
 // ======================================================
-// OBTENER LISTA DE UNA SECCIÓN
+// EXTRAER EPISODIOS
 // ======================================================
 
-async function obtenerSeccion(seccion) {
+function extraerEpisodios(
+    $,
+    paginaBase
+) {
 
-    const url =
-        `${BASE}/${seccion}/`;
+    const episodios = [];
+
+    const vistos =
+        new Set();
+
+
+    $("a[href]").each(
+        (_, elemento) => {
+
+            const texto =
+                $(elemento)
+                    .text()
+                    .trim()
+                    .replace(/\s+/g, " ");
+
+
+            const href =
+                $(elemento)
+                    .attr("href");
+
+
+            if (!href) return;
+
+
+            const url =
+                unirUrl(
+                    paginaBase,
+                    href
+                );
+
+
+            if (!url) return;
+
+
+            const contenido =
+                `${texto} ${url}`
+                    .toLowerCase();
+
+
+            /*
+             * Detectar:
+             *
+             * Episodio 1
+             * Episode 1
+             * Capítulo 1
+             * 1x1
+             * 1x2
+             * etc.
+             */
+
+            const pareceEpisodio =
+                /episodio|episode|capitulo|capítulo|\b\d+\s*x\s*\d+\b|\bep\.?\s*\d+/i
+                    .test(contenido);
+
+
+            if (!pareceEpisodio) {
+                return;
+            }
+
+
+            if (vistos.has(url)) {
+                return;
+            }
+
+
+            vistos.add(url);
+
+
+            episodios.push({
+
+                nombre:
+                    texto ||
+                    `Episodio ${episodios.length + 1}`,
+
+                link: url,
+
+                video: null
+
+            });
+
+        }
+    );
+
+
+    return episodios;
+}
+
+
+// ======================================================
+// PROCESAR EPISODIOS
+// ======================================================
+
+async function procesarEpisodios(item) {
+
+    if (
+        !Array.isArray(item.episodios) ||
+        !item.episodios.length
+    ) {
+
+        return item;
+
+    }
+
+
+    const episodios = [];
+
+
+    for (
+        const episodio
+        of item.episodios
+    ) {
+
+        try {
+
+            const $ =
+                await obtener(
+                    episodio.link
+                );
+
+
+            let reproductor = null;
+
+
+            $("iframe[src]").each(
+                (_, iframe) => {
+
+                    if (reproductor) return;
+
+
+                    const src =
+                        $(iframe)
+                            .attr("src");
+
+
+                    if (!src) return;
+
+
+                    const iframeUrl =
+                        unirUrl(
+                            episodio.link,
+                            src
+                        );
+
+
+                    if (
+                        iframeUrl &&
+                        iframeUrl.startsWith(BASE)
+                    ) {
+
+                        reproductor =
+                            iframeUrl;
+
+                    }
+
+                }
+            );
+
+
+            episodios.push({
+
+                nombre:
+                    episodio.nombre,
+
+                link:
+                    episodio.link,
+
+                video:
+                    reproductor
+
+            });
+
+        } catch {
+
+            episodios.push({
+
+                nombre:
+                    episodio.nombre,
+
+                link:
+                    episodio.link,
+
+                video:
+                    null
+
+            });
+
+        }
+
+    }
+
+
+    item.episodios =
+        episodios;
+
+
+    return item;
+}
+
+
+// ======================================================
+// BUSCAR EN UNA SECCIÓN
+// ======================================================
+
+async function buscarSeccion(
+    seccion,
+    termino = ""
+) {
+
+    let url;
+
+
+    if (termino) {
+
+        url =
+            BASE +
+            "/?s=" +
+            encodeURIComponent(termino);
+
+    } else {
+
+        url =
+            BASE +
+            "/" +
+            seccion +
+            "/";
+
+    }
 
 
     console.log(
-        `Cargando sección: ${url}`
+        "Buscando:",
+        url
     );
 
 
@@ -646,87 +678,124 @@ async function obtenerSeccion(seccion) {
         new Set();
 
 
-    $("a[href]").each((_, elemento) => {
+    $("a[href]").each(
+        (_, elemento) => {
 
-        let href =
-            $(elemento)
-                .attr("href");
-
-
-        if (!href) return;
+            let href =
+                $(elemento)
+                    .attr("href");
 
 
-        const urlCompleta =
-            unirUrl(BASE, href);
+            if (!href) return;
 
 
-        if (!urlCompleta) return;
+            href =
+                unirUrl(
+                    BASE,
+                    href
+                );
 
 
-        const limpia =
-            limpiarUrl(
-                urlCompleta
-            );
+            if (!href) return;
 
 
-        /*
-         * Solamente enlaces de la
-         * sección actual.
-         */
+            href =
+                limpiarUrl(href);
 
-        if (
-            !limpia.startsWith(
-                `${BASE}/${seccion}/`
-            )
-        ) {
-            return;
+
+            let permitido = false;
+
+
+            if (seccion === "peliculas") {
+
+                permitido =
+                    href.startsWith(
+                        BASE +
+                        "/peliculas/"
+                    );
+
+            }
+
+
+            if (seccion === "series") {
+
+                permitido =
+                    href.startsWith(
+                        BASE +
+                        "/series/"
+                    );
+
+            }
+
+
+            if (
+                seccion === "animes"
+            ) {
+
+                permitido =
+                    href.startsWith(
+                        BASE +
+                        "/animes/"
+                    ) ||
+                    href.startsWith(
+                        BASE +
+                        "/anime/"
+                    );
+
+            }
+
+
+            if (!permitido) {
+                return;
+            }
+
+
+            // No incluir la propia sección
+
+            if (
+                href.replace(/\/$/, "") ===
+                (
+                    BASE +
+                    "/" +
+                    seccion +
+                    "/"
+                ).replace(/\/$/, "")
+            ) {
+                return;
+            }
+
+
+            // No paginación
+
+            if (
+                /\/page\/\d+\/?$/
+                    .test(href)
+            ) {
+                return;
+            }
+
+
+            links.add(href);
+
         }
-
-
-        /*
-         * No agregar la página principal.
-         */
-
-        if (
-            limpia.replace(/\/$/, "") ===
-            url.replace(/\/$/, "")
-        ) {
-            return;
-        }
-
-
-        /*
-         * No agregar paginación.
-         */
-
-        if (
-            /\/page\/\d+\/?$/.test(limpia)
-        ) {
-            return;
-        }
-
-
-        links.add(limpia);
-
-    });
+    );
 
 
     const lista =
-        Array.from(links);
+        Array.from(links)
+            .sort();
 
 
     console.log(
-        `${seccion}: ${lista.length} enlaces`
+        `Encontrados en ${seccion}:`,
+        lista.length
     );
 
 
     const resultados = [];
 
 
-    /*
-     * Límite para evitar que Render
-     * se quede procesando demasiado.
-     */
+    // Evita sobrecargar Render
 
     const limite =
         Math.min(
@@ -743,27 +812,44 @@ async function obtenerSeccion(seccion) {
 
         try {
 
-            console.log(
-                `[${i + 1}/${limite}] ${lista[i]}`
-            );
-
-
-            const item =
-                await procesarItem(
+            let item =
+                await procesarPagina(
                     lista[i]
                 );
 
 
+            if (
+                item.tipo === "Serie" ||
+                item.tipo === "Anime"
+            ) {
+
+                item =
+                    await procesarEpisodios(
+                        item
+                    );
+
+            }
+
+
             resultados.push(item);
+
+
+            console.log(
+                `[${i + 1}/${limite}]`,
+                item.nombre
+            );
+
 
         } catch (error) {
 
             console.error(
-                "Error procesando:",
+                "Error:",
                 lista[i],
                 error.message
             );
+
         }
+
     }
 
 
@@ -772,120 +858,153 @@ async function obtenerSeccion(seccion) {
 
 
 // ======================================================
-// API - PELÍCULAS
+// CATÁLOGO COMPLETO
+// ======================================================
+
+async function obtenerCatalogo() {
+
+    const [peliculas, series, animes] =
+        await Promise.all([
+
+            buscarSeccion(
+                "peliculas"
+            ),
+
+            buscarSeccion(
+                "series"
+            ),
+
+            buscarSeccion(
+                "animes"
+            )
+
+        ]);
+
+
+    return [
+
+        ...peliculas,
+
+        ...series,
+
+        ...animes
+
+    ];
+}
+
+
+// ======================================================
+// API - CATÁLOGO
 // ======================================================
 
 app.get(
-    "/api/peliculas",
+    "/api/catalogo",
     async (req, res) => {
 
         try {
 
             const resultados =
-                await obtenerSeccion(
-                    "peliculas"
-                );
+                await obtenerCatalogo();
 
 
             res.json({
+
                 resultados
+
             });
+
 
         } catch (error) {
 
             console.error(error);
 
+
             res.status(500).json({
 
                 error:
-                    "No se pudieron cargar las películas",
+                    "No se pudo cargar el catálogo",
 
                 detalle:
                     error.message
 
             });
+
         }
+
     }
 );
 
 
 // ======================================================
-// API - SERIES
+// API - SECCIÓN
 // ======================================================
 
 app.get(
-    "/api/series",
+    "/api/seccion/:tipo",
     async (req, res) => {
 
         try {
 
-            const resultados =
-                await obtenerSeccion(
-                    "series"
-                );
+            let tipo =
+                req.params.tipo
+                    .toLowerCase();
 
 
-            res.json({
-                resultados
-            });
-
-        } catch (error) {
-
-            console.error(error);
-
-            res.status(500).json({
-
-                error:
-                    "No se pudieron cargar las series",
-
-                detalle:
-                    error.message
-
-            });
-        }
-    }
-);
+            if (tipo === "anime") {
+                tipo = "animes";
+            }
 
 
-// ======================================================
-// API - ANIME
-// ======================================================
-
-app.get(
-    "/api/animes",
-    async (req, res) => {
-
-        try {
-
-            /*
-             * La sección que indicaste es:
-             * /animes/
-             */
-
-            const resultados =
-                await obtenerSeccion(
+            if (
+                ![
+                    "peliculas",
+                    "series",
                     "animes"
+                ].includes(tipo)
+            ) {
+
+                return res
+                    .status(400)
+                    .json({
+
+                        error:
+                            "Sección no válida"
+
+                    });
+
+            }
+
+
+            const resultados =
+                await buscarSeccion(
+                    tipo
                 );
 
 
             res.json({
+
                 resultados
+
             });
+
 
         } catch (error) {
 
             console.error(error);
 
+
             res.status(500).json({
 
                 error:
-                    "No se pudieron cargar los animes",
+                    "No se pudo cargar la sección",
 
                 detalle:
                     error.message
 
             });
+
         }
+
     }
 );
 
@@ -903,111 +1022,43 @@ app.get(
             const termino =
                 String(
                     req.query.q || ""
-                )
-                .trim()
-                .toLowerCase();
+                ).trim();
 
 
             if (!termino) {
 
-                return res.json({
-                    resultados: []
-                });
+                return res
+                    .status(400)
+                    .json({
+
+                        error:
+                            "Escribe algo para buscar"
+
+                    });
+
             }
 
 
-            /*
-             * Buscar en las tres secciones.
-             */
-
             const [
                 peliculas,
                 series,
                 animes
             ] = await Promise.all([
 
-                obtenerSeccion("peliculas"),
+                buscarSeccion(
+                    "peliculas",
+                    termino
+                ),
 
-                obtenerSeccion("series"),
+                buscarSeccion(
+                    "series",
+                    termino
+                ),
 
-                obtenerSeccion("animes")
-
-            ]);
-
-
-            const todos = [
-
-                ...peliculas,
-
-                ...series,
-
-                ...animes
-
-            ];
-
-
-            const resultados =
-                todos.filter(item => {
-
-                    const texto =
-                        [
-                            item.nombre,
-                            item.descripcion,
-                            item.tipo
-                        ]
-                        .join(" ")
-                        .toLowerCase();
-
-
-                    return texto.includes(
-                        termino
-                    );
-                });
-
-
-            res.json({
-                resultados
-            });
-
-        } catch (error) {
-
-            console.error(error);
-
-            res.status(500).json({
-
-                error:
-                    "No se pudo realizar la búsqueda",
-
-                detalle:
-                    error.message
-
-            });
-        }
-    }
-);
-
-
-// ======================================================
-// CATÁLOGO GENERAL
-// ======================================================
-
-app.get(
-    "/api/catalogo",
-    async (req, res) => {
-
-        try {
-
-            const [
-                peliculas,
-                series,
-                animes
-            ] = await Promise.all([
-
-                obtenerSeccion("peliculas"),
-
-                obtenerSeccion("series"),
-
-                obtenerSeccion("animes")
+                buscarSeccion(
+                    "animes",
+                    termino
+                )
 
             ]);
 
@@ -1026,20 +1077,24 @@ app.get(
 
             });
 
+
         } catch (error) {
 
             console.error(error);
 
+
             res.status(500).json({
 
                 error:
-                    "No se pudo cargar el catálogo",
+                    "No se pudo realizar la búsqueda",
 
                 detalle:
                     error.message
 
             });
+
         }
+
     }
 );
 
@@ -1061,16 +1116,26 @@ app.use(
 // ======================================================
 // SPA
 // ======================================================
+//
+// IMPORTANTE:
+// No usamos app.get("*") porque Express 5
+// produce el PathError que te apareció.
+// ======================================================
 
-app.use((req, res) => {
-    res.sendFile(
-        path.join(
-            __dirname,
-            "public",
-            "index.html"
-        )
-    );
-});
+app.use(
+    (req, res) => {
+
+        res.sendFile(
+            path.join(
+                __dirname,
+                "public",
+                "index.html"
+            )
+        );
+
+    }
+);
+
 
 // ======================================================
 // SERVIDOR
