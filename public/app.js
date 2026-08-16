@@ -1,85 +1,144 @@
-const peliculasContainer =
-    document.getElementById("peliculas-container");
-
-const seriesContainer =
-    document.getElementById("series-container");
-
-const animeContainer =
-    document.getElementById("anime-container");
-
-const busquedaContainer =
-    document.getElementById("busqueda-container");
-
-const busquedaSection =
-    document.getElementById("busqueda-section");
+const moviesContainer =
+    document.getElementById(
+        "movies-container"
+    );
 
 const searchInput =
-    document.getElementById("search");
+    document.getElementById(
+        "search"
+    );
+
+const resultadoInfo =
+    document.getElementById(
+        "resultado-info"
+    );
+
+const sectionTitle =
+    document.getElementById(
+        "section-title"
+    );
 
 const player =
-    document.getElementById("player");
+    document.getElementById(
+        "player"
+    );
 
 const playerTitle =
-    document.getElementById("player-title");
+    document.getElementById(
+        "player-title"
+    );
 
 const infoTitle =
-    document.getElementById("info-title");
+    document.getElementById(
+        "info-title"
+    );
 
 const infoDescription =
-    document.getElementById("info-description");
+    document.getElementById(
+        "info-description"
+    );
 
 const infoTags =
-    document.getElementById("info-tags");
+    document.getElementById(
+        "info-tags"
+    );
 
-const episodiosSection =
-    document.getElementById("episodios-section");
+const videoStatus =
+    document.getElementById(
+        "video-status"
+    );
 
-const episodiosLista =
-    document.getElementById("episodios-lista");
+const episodesSection =
+    document.getElementById(
+        "episodes-section"
+    );
 
-const episodiosCount =
-    document.getElementById("episodios-count");
+const episodesList =
+    document.getElementById(
+        "episodes-list"
+    );
 
-const peliculasCount =
-    document.getElementById("peliculas-count");
-
-const seriesCount =
-    document.getElementById("series-count");
-
-const animeCount =
-    document.getElementById("anime-count");
-
-const busquedaCount =
-    document.getElementById("busqueda-count");
+const episodesCount =
+    document.getElementById(
+        "episodes-count"
+    );
 
 
 let catalogo = [];
 
-let busquedaTimer = null;
+let seccionActual =
+    "inicio";
+
+let seleccionActual = null;
 
 
 // ======================================================
-// API
+// DETERMINAR SECCIÓN
 // ======================================================
 
-async function obtenerAPI(url) {
+function obtenerSeccion() {
 
-    const respuesta =
-        await fetch(url, {
-            cache: "no-store"
-        });
+    const ruta =
+        window.location.pathname
+            .toLowerCase();
 
 
-    if (!respuesta.ok) {
+    if (
+        ruta.startsWith(
+            "/peliculas"
+        )
+    ) {
 
-        throw new Error(
-            `HTTP ${respuesta.status}`
-        );
+        return "peliculas";
 
     }
 
 
-    return respuesta.json();
+    if (
+        ruta.startsWith(
+            "/series"
+        )
+    ) {
+
+        return "series";
+
+    }
+
+
+    if (
+        ruta.startsWith(
+            "/animes"
+        )
+    ) {
+
+        return "animes";
+
+    }
+
+
+    return "inicio";
+}
+
+
+// ======================================================
+// TÍTULO
+// ======================================================
+
+function tituloSeccion(tipo) {
+
+    if (tipo === "peliculas") {
+        return "Películas";
+    }
+
+    if (tipo === "series") {
+        return "Series";
+    }
+
+    if (tipo === "animes") {
+        return "Anime";
+    }
+
+    return "Recomendaciones";
 }
 
 
@@ -87,34 +146,133 @@ async function obtenerAPI(url) {
 // CARGAR CATÁLOGO
 // ======================================================
 
-async function cargarCatalogo() {
+async function cargarCatalogo(tipo) {
 
-    peliculasContainer.innerHTML =
-        loading("Cargando películas...");
+    seccionActual =
+        tipo;
 
-    seriesContainer.innerHTML =
-        loading("Cargando series...");
 
-    animeContainer.innerHTML =
-        loading("Cargando anime...");
+    sectionTitle.textContent =
+        tituloSeccion(tipo);
+
+
+    moviesContainer.innerHTML = `
+        <div class="loading">
+            Cargando ${tipo === "inicio"
+                ? "recomendaciones"
+                : tituloSeccion(tipo).toLowerCase()
+            }...
+        </div>
+    `;
 
 
     try {
 
-        const datos =
-            await obtenerAPI(
-                "/api/catalogo"
-            );
+        let resultados = [];
+
+
+        // ==================================================
+        // INICIO
+        // ==================================================
+
+        if (tipo === "inicio") {
+
+            /*
+             * En inicio cargamos una pequeña
+             * muestra de cada categoría.
+             */
+
+            const tipos = [
+                "peliculas",
+                "series",
+                "animes"
+            ];
+
+
+            for (
+                const categoria
+                of tipos
+            ) {
+
+                try {
+
+                    const respuesta =
+                        await fetch(
+                            `/api/catalogo?tipo=${categoria}`,
+                            {
+                                cache:
+                                    "no-store"
+                            }
+                        );
+
+
+                    if (!respuesta.ok) {
+                        continue;
+                    }
+
+
+                    const datos =
+                        await respuesta.json();
+
+
+                    if (
+                        Array.isArray(
+                            datos.resultados
+                        )
+                    ) {
+
+                        resultados.push(
+                            ...datos.resultados
+                                .slice(0, 6)
+                        );
+
+                    }
+
+                } catch {}
+
+            }
+
+        } else {
+
+            const respuesta =
+                await fetch(
+                    `/api/catalogo?tipo=${tipo}`,
+                    {
+                        cache:
+                            "no-store"
+                    }
+                );
+
+
+            if (!respuesta.ok) {
+
+                throw new Error(
+                    `HTTP ${respuesta.status}`
+                );
+
+            }
+
+
+            const datos =
+                await respuesta.json();
+
+
+            resultados =
+                Array.isArray(
+                    datos.resultados
+                )
+                    ? datos.resultados
+                    : [];
+
+        }
 
 
         catalogo =
-            Array.isArray(datos.resultados)
-                ? datos.resultados
-                : [];
+            resultados;
 
 
-        mostrarSecciones(
-            catalogo
+        mostrarCatalogo(
+            resultados
         );
 
 
@@ -123,14 +281,17 @@ async function cargarCatalogo() {
         console.error(error);
 
 
-        peliculasContainer.innerHTML =
-            errorHTML(error);
-
-        seriesContainer.innerHTML =
-            errorHTML(error);
-
-        animeContainer.innerHTML =
-            errorHTML(error);
+        moviesContainer.innerHTML = `
+            <div class="loading">
+                No se pudo cargar el contenido.
+                <br><br>
+                <small>
+                    ${escapeHtml(
+                        error.message
+                    )}
+                </small>
+            </div>
+        `;
 
     }
 
@@ -138,158 +299,161 @@ async function cargarCatalogo() {
 
 
 // ======================================================
-// SEPARAR CONTENIDOS
+// MOSTRAR CATÁLOGO
 // ======================================================
 
-function mostrarSecciones(lista) {
+function mostrarCatalogo(lista) {
 
-    const peliculas =
-        lista.filter(
-            item => item.tipo === "Película"
-        );
-
-
-    const series =
-        lista.filter(
-            item => item.tipo === "Serie"
-        );
-
-
-    const anime =
-        lista.filter(
-            item => item.tipo === "Anime"
-        );
-
-
-    peliculasCount.textContent =
-        `${peliculas.length} títulos`;
-
-
-    seriesCount.textContent =
-        `${series.length} títulos`;
-
-
-    animeCount.textContent =
-        `${anime.length} títulos`;
-
-
-    mostrarCards(
-        peliculas,
-        peliculasContainer
-    );
-
-
-    mostrarCards(
-        series,
-        seriesContainer
-    );
-
-
-    mostrarCards(
-        anime,
-        animeContainer
-    );
-
-}
-
-
-// ======================================================
-// CARDS
-// ======================================================
-
-function mostrarCards(lista, container) {
-
-    container.innerHTML = "";
+    moviesContainer.innerHTML = "";
 
 
     if (!lista.length) {
 
-        container.innerHTML = `
-
+        moviesContainer.innerHTML = `
             <div class="loading">
-
-                No hay contenido disponible.
-
+                No se encontraron contenidos.
             </div>
-
         `;
 
+
+        resultadoInfo.textContent =
+            "0 resultados";
+
+
         return;
+
     }
 
 
-    lista.forEach(item => {
-
-        const card =
-            document.createElement("article");
+    resultadoInfo.textContent =
+        `${lista.length} resultados`;
 
 
-        card.className =
-            "movie";
+    lista.forEach(
+        item => {
+
+            const card =
+                document.createElement(
+                    "article"
+                );
 
 
-        const portada =
-            item.portada ||
-            placeholder();
+            card.className =
+                "movie";
 
 
-        const nombre =
-            item.nombre ||
-            "Sin título";
+            const portada =
+                item.portada ||
+                crearPortadaAlternativa(
+                    item.nombre
+                );
 
 
-        const tipo =
-            item.tipo ||
-            "Contenido";
+            const nombre =
+                item.nombre ||
+                "Sin título";
 
 
-        card.innerHTML = `
-
-            <img
-                src="${escapeAttribute(portada)}"
-                alt="${escapeAttribute(nombre)}"
-                loading="lazy"
-            >
-
-            <div class="movie-info-small">
-
-                <h3>
-                    ${escapeHtml(nombre)}
-                </h3>
-
-                <span>
-                    ${escapeHtml(tipo)}
-                </span>
-
-            </div>
-
-        `;
+            const tipo =
+                item.tipo ||
+                "Contenido";
 
 
-        const imagen =
-            card.querySelector("img");
+            card.innerHTML = `
+
+                <img
+                    src="${escapeAttribute(
+                        portada
+                    )}"
+                    alt="${escapeAttribute(
+                        nombre
+                    )}"
+                    loading="lazy"
+                >
+
+                <div
+                    class="movie-info-small"
+                >
+
+                    <h3>
+                        ${escapeHtml(
+                            nombre
+                        )}
+                    </h3>
+
+                    <span>
+                        ${escapeHtml(
+                            tipo
+                        )}
+                    </span>
+
+                </div>
+            `;
 
 
-        imagen.addEventListener(
-            "error",
-            () => {
+            const imagen =
+                card.querySelector(
+                    "img"
+                );
 
-                imagen.src =
-                    placeholder();
 
-            }
+            imagen.addEventListener(
+                "error",
+                () => {
+
+                    imagen.src =
+                        crearPortadaAlternativa(
+                            nombre
+                        );
+
+                },
+                {
+                    once: true
+                }
+            );
+
+
+            card.addEventListener(
+                "click",
+                () => {
+
+                    seleccionar(item);
+
+                }
+            );
+
+
+            moviesContainer.appendChild(
+                card
+            );
+
+        }
+    );
+
+}
+
+
+// ======================================================
+// PORTADA ALTERNATIVA
+// ======================================================
+
+function crearPortadaAlternativa(
+    nombre
+) {
+
+    const texto =
+        encodeURIComponent(
+            String(
+                nombre ||
+                "MovieZone"
+            ).substring(0, 35)
         );
 
 
-        card.addEventListener(
-            "click",
-            () => seleccionar(item)
-        );
-
-
-        container.appendChild(card);
-
-    });
+    return (
+        "https://placehold.co/600x900/11131a/ffffff" +
+        `?text=${texto}`
+    );
 
 }
 
@@ -300,17 +464,21 @@ function mostrarCards(lista, container) {
 
 function seleccionar(item) {
 
-    if (!item) return;
+    seleccionActual =
+        item;
+
+
+    const nombre =
+        item.nombre ||
+        "Sin título";
 
 
     playerTitle.textContent =
-        item.nombre ||
-        "Reproductor";
+        nombre;
 
 
     infoTitle.textContent =
-        item.nombre ||
-        "Sin título";
+        nombre;
 
 
     infoDescription.textContent =
@@ -318,32 +486,85 @@ function seleccionar(item) {
         "Sin descripción disponible.";
 
 
-    mostrarTags(item);
+    infoTags.innerHTML = "";
 
 
-    mostrarEpisodios(item);
+    agregarTag(
+        item.tipo ||
+        "Contenido"
+    );
 
 
-    /*
-     * Si existe reproductor propio,
-     * se carga en el iframe.
-     */
+    if (item.year) {
 
-    if (item.reproductor) {
-
-        reproducir(
-            item.reproductor
+        agregarTag(
+            item.year
         );
-
-    } else {
-
-        reproducir(null);
 
     }
 
 
+    if (item.genero) {
+
+        agregarTag(
+            item.genero
+        );
+
+    }
+
+
+    // ==================================================
+    // REPRODUCTOR
+    // ==================================================
+
+    videoStatus.innerHTML = "";
+
+
+    if (item.video) {
+
+        reproducir(
+            item.video
+        );
+
+
+        videoStatus.innerHTML = `
+            <div
+                class="tag"
+                style="margin-top:15px;"
+            >
+                Reproductor disponible
+            </div>
+        `;
+
+    } else {
+
+        player.src =
+            "about:blank";
+
+
+        videoStatus.innerHTML = `
+            <div class="no-video">
+                Sin reproductor disponible
+                por el momento.
+            </div>
+        `;
+
+    }
+
+
+    // ==================================================
+    // EPISODIOS
+    // ==================================================
+
+    mostrarEpisodios(
+        item
+    );
+
+
     document
-        .getElementById("reproductor")
+        .getElementById(
+            "reproductor"
+        )
         .scrollIntoView({
             behavior: "smooth"
         });
@@ -352,7 +573,7 @@ function seleccionar(item) {
 
 
 // ======================================================
-// REPRODUCTOR
+// REPRODUCIR
 // ======================================================
 
 function reproducir(url) {
@@ -363,10 +584,12 @@ function reproducir(url) {
             "about:blank";
 
         return;
+
     }
 
 
-    player.src = url;
+    player.src =
+        url;
 
 }
 
@@ -377,24 +600,20 @@ function reproducir(url) {
 
 function mostrarEpisodios(item) {
 
-    episodiosLista.innerHTML = "";
+    episodesList.innerHTML = "";
 
 
     const episodios =
-        Array.isArray(item.episodios)
+        Array.isArray(
+            item.episodios
+        )
             ? item.episodios
             : [];
 
 
-    if (
-        episodios.length === 0 ||
-        (
-            item.tipo !== "Serie" &&
-            item.tipo !== "Anime"
-        )
-    ) {
+    if (!episodios.length) {
 
-        episodiosSection.style.display =
+        episodesSection.style.display =
             "none";
 
         return;
@@ -402,11 +621,11 @@ function mostrarEpisodios(item) {
     }
 
 
-    episodiosSection.style.display =
+    episodesSection.style.display =
         "block";
 
 
-    episodiosCount.textContent =
+    episodesCount.textContent =
         `${episodios.length} episodios`;
 
 
@@ -414,7 +633,9 @@ function mostrarEpisodios(item) {
         (episodio, index) => {
 
             const boton =
-                document.createElement("button");
+                document.createElement(
+                    "button"
+                );
 
 
             boton.className =
@@ -426,14 +647,18 @@ function mostrarEpisodios(item) {
                 <strong>
                     ${escapeHtml(
                         episodio.nombre ||
-                        `Episodio ${index + 1}`
+                        `Episodio ${
+                            index + 1
+                        }`
                     )}
                 </strong>
 
                 <small>
-                    ${episodio.video
-                        ? "Disponible"
-                        : "Reproductor no disponible"}
+                    ${
+                        episodio.video
+                            ? "Disponible"
+                            : "Sin reproductor"
+                    }
                 </small>
 
             `;
@@ -443,40 +668,63 @@ function mostrarEpisodios(item) {
                 "click",
                 () => {
 
-                    if (!episodio.video) {
+                    playerTitle.textContent =
+                        `${item.nombre} - ${
+                            episodio.nombre ||
+                            `Episodio ${
+                                index + 1
+                            }`
+                        }`;
 
-                        alert(
-                            "Este episodio no tiene un reproductor disponible."
+
+                    if (
+                        episodio.video
+                    ) {
+
+                        reproducir(
+                            episodio.video
                         );
 
-                        return;
+
+                        videoStatus.innerHTML = `
+                            <div
+                                class="tag"
+                                style="margin-top:15px;"
+                            >
+                                Reproductor disponible
+                            </div>
+                        `;
+
+                    } else {
+
+                        player.src =
+                            "about:blank";
+
+
+                        videoStatus.innerHTML = `
+                            <div class="no-video">
+                                Sin reproductor disponible
+                                por el momento.
+                            </div>
+                        `;
 
                     }
 
 
-                    reproducir(
-                        episodio.video
-                    );
-
-
-                    playerTitle.textContent =
-                        `${item.nombre} - ${
-                            episodio.nombre ||
-                            `Episodio ${index + 1}`
-                        }`;
-
-
                     document
-                        .getElementById("reproductor")
+                        .getElementById(
+                            "reproductor"
+                        )
                         .scrollIntoView({
-                            behavior: "smooth"
+                            behavior:
+                                "smooth"
                         });
 
                 }
             );
 
 
-            episodiosLista.appendChild(
+            episodesList.appendChild(
                 boton
             );
 
@@ -487,51 +735,20 @@ function mostrarEpisodios(item) {
 
 
 // ======================================================
-// TAGS
-// ======================================================
-
-function mostrarTags(item) {
-
-    infoTags.innerHTML = "";
-
-
-    if (item.tipo) {
-        agregarTag(item.tipo);
-    }
-
-
-    if (item.genero) {
-        agregarTag(item.genero);
-    }
-
-
-    if (item.year) {
-        agregarTag(item.year);
-    }
-
-
-    if (
-        Array.isArray(item.episodios) &&
-        item.episodios.length
-    ) {
-
-        agregarTag(
-            `${item.episodios.length} episodios`
-        );
-
-    }
-
-}
-
-
-// ======================================================
 // TAG
 // ======================================================
 
 function agregarTag(texto) {
 
+    if (!texto) {
+        return;
+    }
+
+
     const tag =
-        document.createElement("span");
+        document.createElement(
+            "span"
+        );
 
 
     tag.className =
@@ -553,49 +770,43 @@ function agregarTag(texto) {
 // BÚSQUEDA
 // ======================================================
 
+let timeoutBusqueda = null;
+
+
 searchInput.addEventListener(
     "input",
     () => {
+
+        clearTimeout(
+            timeoutBusqueda
+        );
+
 
         const texto =
             searchInput.value
                 .trim();
 
 
-        clearTimeout(
-            busquedaTimer
-        );
-
-
         if (!texto) {
 
-            busquedaSection.style.display =
-                "none";
-
-
-            document
-                .getElementById("peliculas")
-                .style.display = "";
-
-
-            document
-                .getElementById("series")
-                .style.display = "";
-
-
-            document
-                .getElementById("anime")
-                .style.display = "";
-
+            mostrarCatalogo(
+                catalogo
+            );
 
             return;
 
         }
 
 
-        busquedaTimer =
+        timeoutBusqueda =
             setTimeout(
-                () => ejecutarBusqueda(texto),
+                () => {
+
+                    buscar(
+                        texto
+                    );
+
+                },
                 400
             );
 
@@ -604,62 +815,61 @@ searchInput.addEventListener(
 
 
 // ======================================================
-// EJECUTAR BÚSQUEDA
+// BUSCAR EN SERVIDOR
 // ======================================================
 
-async function ejecutarBusqueda(texto) {
+async function buscar(texto) {
 
-    busquedaSection.style.display =
-        "block";
-
-
-    busquedaContainer.innerHTML =
-        loading(
-            `Buscando "${texto}"...`
-        );
-
-
-    /*
-     * Ocultar las secciones del catálogo
-     * mientras se muestran resultados.
-     */
-
-    document
-        .getElementById("peliculas")
-        .style.display = "none";
-
-
-    document
-        .getElementById("series")
-        .style.display = "none";
-
-
-    document
-        .getElementById("anime")
-        .style.display = "none";
+    moviesContainer.innerHTML = `
+        <div class="loading">
+            Buscando...
+        </div>
+    `;
 
 
     try {
 
-        const datos =
-            await obtenerAPI(
-                `/api/buscar?q=${encodeURIComponent(texto)}`
+        const respuesta =
+            await fetch(
+                `/api/buscar?q=${
+                    encodeURIComponent(
+                        texto
+                    )
+                }`,
+                {
+                    cache:
+                        "no-store"
+                }
             );
 
 
+        if (!respuesta.ok) {
+
+            throw new Error(
+                `HTTP ${respuesta.status}`
+            );
+
+        }
+
+
+        const datos =
+            await respuesta.json();
+
+
         const resultados =
-            Array.isArray(datos.resultados)
+            Array.isArray(
+                datos.resultados
+            )
                 ? datos.resultados
                 : [];
 
 
-        busquedaCount.textContent =
+        resultadoInfo.textContent =
             `${resultados.length} resultados`;
 
 
-        mostrarCards(
-            resultados,
-            busquedaContainer
+        mostrarCatalogo(
+            resultados
         );
 
 
@@ -668,8 +878,11 @@ async function ejecutarBusqueda(texto) {
         console.error(error);
 
 
-        busquedaContainer.innerHTML =
-            errorHTML(error);
+        moviesContainer.innerHTML = `
+            <div class="loading">
+                Error al buscar.
+            </div>
+        `;
 
     }
 
@@ -677,112 +890,142 @@ async function ejecutarBusqueda(texto) {
 
 
 // ======================================================
-// ESCAPAR HTML
+// NAVEGACIÓN
 // ======================================================
 
-function escapeHtml(texto) {
+document
+    .querySelectorAll(
+        "nav a"
+    )
+    .forEach(
+        enlace => {
 
-    return String(texto)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+            enlace.addEventListener(
+                "click",
+                event => {
 
-}
+                    event.preventDefault();
 
 
-function escapeAttribute(texto) {
+                    const destino =
+                        enlace.getAttribute(
+                            "href"
+                        );
 
-    return escapeHtml(texto);
 
-}
+                    history.pushState(
+                        {},
+                        "",
+                        destino
+                    );
+
+
+                    cargarRuta();
+
+                }
+            );
+
+        }
+    );
 
 
 // ======================================================
-// PLACEHOLDER
+// CARGAR RUTA
 // ======================================================
 
-function placeholder() {
+function cargarRuta() {
 
-    return (
-        "data:image/svg+xml," +
-        encodeURIComponent(`
+    const tipo =
+        obtenerSeccion();
 
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="300"
-                height="450"
-                viewBox="0 0 300 450"
-            >
 
-                <rect
-                    width="300"
-                    height="450"
-                    fill="#171922"
-                />
+    document
+        .querySelectorAll(
+            "nav a"
+        )
+        .forEach(
+            enlace => {
 
-                <text
-                    x="150"
-                    y="225"
-                    fill="#777"
-                    text-anchor="middle"
-                    font-size="18"
-                    font-family="Arial"
-                >
-                    Sin portada
-                </text>
+                const ruta =
+                    enlace.dataset.route;
 
-            </svg>
 
-        `)
+                enlace.classList.toggle(
+                    "active",
+                    ruta === tipo
+                );
+
+            }
+        );
+
+
+    searchInput.value = "";
+
+
+    cargarCatalogo(
+        tipo
     );
 
 }
 
 
 // ======================================================
-// LOADING
+// HISTORIAL
 // ======================================================
 
-function loading(texto) {
+window.addEventListener(
+    "popstate",
+    () => {
 
-    return `
+        cargarRuta();
 
-        <div class="loading">
+    }
+);
 
-            ${escapeHtml(texto)}
 
-        </div>
+// ======================================================
+// SEGURIDAD
+// ======================================================
 
-    `;
+function escapeHtml(texto) {
+
+    return String(texto)
+
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
 
 }
 
 
-// ======================================================
-// ERROR
-// ======================================================
+function escapeAttribute(
+    texto
+) {
 
-function errorHTML(error) {
-
-    return `
-
-        <div class="error">
-
-            No se pudo cargar el contenido.
-
-            <br><br>
-
-            <small>
-                ${escapeHtml(
-                    error.message || "Error desconocido"
-                )}
-            </small>
-
-        </div>
-
-    `;
+    return escapeHtml(
+        texto
+    );
 
 }
 
@@ -791,4 +1034,4 @@ function errorHTML(error) {
 // INICIAR
 // ======================================================
 
-cargarCatalogo();
+cargarRuta();
