@@ -76,32 +76,45 @@ async function enviarNuevosATelegram(items) {
     // Actualizamos el set local para no reenviar en esta sesión
     nuevos.forEach(item => knownLinks.add(item.link));
 
-    // Mensaje resumido
-    let mensaje = `🎬 <b>${nuevos.length} nuevo(s) detectado(s)</b>\n\n`;
-
-    for (const item of nuevos.slice(0, 15)) { // limitamos para no pasarnos del límite de Telegram
-        mensaje += `<b>${item.nombre || "Sin título"}</b>\n`;
-        mensaje += `Tipo: ${item.tipo || "?"}\n`;
-        if (item.soloTrailer) mensaje += `⚠️ Solo trailer (YouTube)\n`;
-        if (item.reproductor) mensaje += `▶ Reproductor: ${item.reproductor}\n`;
-        if (item.portada) mensaje += `🖼 Portada: ${item.portada}\n`;
-        mensaje += `Link: ${item.link}\n`;
-        mensaje += `────────────────\n`;
+    // Función para escapar HTML de Telegram
+    function escapeHtml(text) {
+        if (!text) return "";
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     }
 
-    if (nuevos.length > 15) {
-        mensaje += `\n... y ${nuevos.length - 15} más`;
+    // Enviamos de 8 en 8 para no pasarnos del límite de 4096 caracteres
+    const TAMANO_LOTE = 8;
+
+    for (let i = 0; i < nuevos.length; i += TAMANO_LOTE) {
+        const lote = nuevos.slice(i, i + TAMANO_LOTE);
+
+        let mensaje = `🎬 <b>${lote.length} nuevo(s) detectado(s)</b> (${i + 1}-${Math.min(i + TAMANO_LOTE, nuevos.length)} de ${nuevos.length})\n\n`;
+
+        for (const item of lote) {
+            mensaje += `<b>${escapeHtml(item.nombre || "Sin título")}</b>\n`;
+            mensaje += `Tipo: ${escapeHtml(item.tipo || "?")}\n`;
+            if (item.soloTrailer) mensaje += `⚠️ Solo trailer (YouTube)\n`;
+            if (item.reproductor) mensaje += `▶ ${escapeHtml(item.reproductor)}\n`;
+            if (item.portada) mensaje += `🖼 ${escapeHtml(item.portada)}\n`;
+            mensaje += `Link: ${escapeHtml(item.link)}\n`;
+            mensaje += `────────────────\n`;
+        }
+
+        // Si por alguna razón todavía es demasiado largo, lo cortamos
+        if (mensaje.length > 4000) {
+            mensaje = mensaje.substring(0, 4000) + "\n...(mensaje recortado)";
+        }
+
+        await enviarTelegram(mensaje);
+
+        // Pequeña pausa para no saturar la API de Telegram
+        if (i + TAMANO_LOTE < nuevos.length) {
+            await new Promise(r => setTimeout(r, 600));
+        }
     }
-
-    await enviarTelegram(mensaje);
-
-    // También enviamos el JSON completo de los nuevos como documento (más fácil de copiar)
-    try {
-        const jsonContent = JSON.stringify(nuevos, null, 2);
-        const FormData = require("form-data"); // si no está, usamos otra forma
-        // Como form-data puede no estar instalado, enviamos solo el mensaje de texto por ahora.
-        // Si quieres el archivo .json completo, avísame y lo agregamos con buffer.
-    } catch {}
 }
 
 // ======================================================
