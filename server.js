@@ -107,24 +107,45 @@ async function enviarTelegram(texto) {
     }
 }
 
+
+
 async function guardarEnSupabase(items) {
     if (!items || items.length === 0) return;
 
-    const nuevos = items.filter(item => item.link && !knownLinks.has(item.link));
-    if (nuevos.length === 0) return;
+    // Guardamos TODO lo enriquecido (no solo los "nuevos")
+    // así se actualizan los embeds, episodios, etc.
+    const paraInsertar = items
+        .filter(item => item.link)
+        .map(item => ({
+            link: item.link,
+            nombre: item.nombre || null,
+            titulo_original: item.titulo_original || null,
+            portada: item.portada || null,
+            backdrop: item.backdrop || null,
+            descripcion: item.descripcion || null,
+            year: item.year || null,
+            genero: item.genero || null,
+            tipo: item.tipo || "Película",
+            idiomas: item.idiomas || [],
+            calidad: item.calidad || [],
+            paises: item.paises || [],
+            calificacion: item.calificacion || null,
+            calificacion_comunidad: item.calificacion_comunidad || null,
+            votos: item.votos || null,
+            fecha_estreno: item.fecha_estreno || null,
+            duracion: item.duracion || null,
+            certificacion: item.certificacion || null,
+            ultimo_episodio: item.ultimo_episodio || null,
+            reproductor: item.reproductor || null,
+            embeds: item.embeds || [],
+            downloads: item.downloads || [],
+            solo_trailer: !!item.soloTrailer,
+            episodios: item.episodios || [],
+            temporadas: item.temporadas || [],
+            postId: item.postId || null
+        }));
 
-    const paraInsertar = nuevos.map(item => ({
-        link: item.link,
-        nombre: item.nombre || null,
-        portada: item.portada || null,
-        descripcion: item.descripcion || null,
-        year: item.year || null,
-        genero: item.genero || null,
-        tipo: item.tipo || "Película",
-        reproductor: item.reproductor || null,
-        solo_trailer: !!item.soloTrailer,
-        episodios: item.episodios || []
-    }));
+    if (paraInsertar.length === 0) return;
 
     try {
         const { error } = await supabase
@@ -133,17 +154,24 @@ async function guardarEnSupabase(items) {
 
         if (error) throw error;
 
-        // Actualizamos la memoria local
+        // Actualizamos memoria local
         paraInsertar.forEach(item => {
             knownLinks.add(item.link);
-            moviesDB.unshift(item);
+            // Reemplazamos o agregamos en moviesDB
+            const idx = moviesDB.findIndex(m => m.link === item.link);
+            if (idx >= 0) {
+                moviesDB[idx] = item;
+            } else {
+                moviesDB.unshift(item);
+            }
         });
 
-        console.log(`Guardados ${paraInsertar.length} nuevos en Supabase`);
+        console.log(`Guardados/actualizados ${paraInsertar.length} items en Supabase`);
     } catch (err) {
         console.error("Error guardando en Supabase:", err.message);
     }
 }
+
 
 async function enviarNuevosATelegram(items) {
     if (!items || items.length === 0) return;
