@@ -227,34 +227,120 @@ function seleccionar(item) {
     seleccionActual = item;
     vistaAnterior = Object.keys(vistas).find(k => vistas[k].classList.contains("active")) || "home";
 
-    // Llenar datos del detalle
+    // Título
     document.getElementById("detail-title").textContent = item.nombre || "Sin título";
+
+    // Título original
+    const originalEl = document.getElementById("detail-original");
+    if (item.titulo_original && item.titulo_original !== item.nombre) {
+        originalEl.textContent = item.titulo_original;
+        originalEl.style.display = "block";
+    } else {
+        originalEl.style.display = "none";
+    }
+
+    // Descripción
     document.getElementById("detail-description").textContent =
         item.descripcion || "Sin descripción disponible.";
 
+    // Portada
     const poster = document.getElementById("detail-poster");
     poster.src = item.portada || "https://via.placeholder.com/300x450/11131a/ffffff?text=Sin+portada";
     poster.onerror = () => {
         poster.src = "https://via.placeholder.com/300x450/11131a/ffffff?text=Sin+portada";
     };
 
-    // Tags
+    // Tags (tipo, año, géneros)
     const tags = document.getElementById("detail-tags");
     tags.innerHTML = "";
     if (item.tipo) agregarTag(item.tipo, tags);
     if (item.year) agregarTag(item.year, tags);
-    if (item.genero) agregarTag(item.genero, tags);
+    if (item.genero) {
+        String(item.genero).split(",").forEach(g => {
+            const clean = g.trim();
+            if (clean) agregarTag(clean, tags);
+        });
+    }
     if (item.soloTrailer) agregarTag("Solo trailer", tags);
 
-    // Reproductor
+    // Meta info (calificación, idiomas, calidad)
+    const meta = document.getElementById("detail-meta");
+    meta.innerHTML = "";
+
+    if (item.calificacion) {
+        meta.innerHTML += `<div class="meta-item"><strong>★</strong> ${escapeHtml(String(item.calificacion))}</div>`;
+    }
+    if (item.idiomas && item.idiomas.length) {
+        meta.innerHTML += `<div class="meta-item"><strong>Idioma:</strong> ${escapeHtml(item.idiomas.join(", "))}</div>`;
+    }
+    if (item.calidad && item.calidad.length) {
+        meta.innerHTML += `<div class="meta-item"><strong>Calidad:</strong> ${escapeHtml(item.calidad.join(", "))}</div>`;
+    }
+
+    // ========== SERVIDORES / REPRODUCTORES ==========
+    const serversSection = document.getElementById("servers-section");
+    const serversContainer = document.getElementById("servers-container");
+    serversContainer.innerHTML = "";
+
     const player = document.getElementById("detail-player");
-    if (item.reproductor) {
-        player.src = item.reproductor;
+    let embeds = [];
+
+    if (Array.isArray(item.embeds) && item.embeds.length > 0) {
+        embeds = item.embeds.filter(e => e && e.url);
+    } else if (item.reproductor) {
+        embeds = [{ url: item.reproductor, name: "Servidor 1" }];
+    }
+
+    if (embeds.length > 0) {
+        serversSection.style.display = "block";
+
+        embeds.forEach((embed, index) => {
+            const btn = document.createElement("button");
+            btn.className = "server-btn" + (index === 0 ? " active" : "");
+            btn.textContent = embed.name || embed.server || `Servidor ${index + 1}`;
+
+            btn.addEventListener("click", () => {
+                serversContainer.querySelectorAll(".server-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                player.src = embed.url;
+            });
+
+            serversContainer.appendChild(btn);
+        });
+
+        player.src = embeds[0].url;
     } else {
+        serversSection.style.display = "none";
         player.src = "about:blank";
     }
 
-    // Episodios
+    // ========== DESCARGAS ==========
+    const downloadsSection = document.getElementById("downloads-section");
+    const downloadsContainer = document.getElementById("downloads-container");
+    downloadsContainer.innerHTML = "";
+
+    const downloads = Array.isArray(item.downloads) ? item.downloads : [];
+
+    if (downloads.length > 0) {
+        downloadsSection.style.display = "block";
+
+        downloads.forEach((dl, index) => {
+            const url = dl.url || dl.link || (typeof dl === "string" ? dl : null);
+            if (!url || typeof url !== "string") return;
+
+            const a = document.createElement("a");
+            a.className = "download-btn";
+            a.href = url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.innerHTML = `⬇ ${escapeHtml(dl.name || dl.server || `Descarga ${index + 1}`)}`;
+            downloadsContainer.appendChild(a);
+        });
+    } else {
+        downloadsSection.style.display = "none";
+    }
+
+    // ========== EPISODIOS ==========
     const episodesSection = document.getElementById("episodes-section");
     const episodesContainer = document.getElementById("episodes-container");
     episodesContainer.innerHTML = "";

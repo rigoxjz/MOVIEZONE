@@ -428,6 +428,66 @@ main {
     color: white;
 }
 
+/* ========== DETALLE MEJORADO ========== */
+.original-title {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+.meta-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: #bbb;
+}
+
+.meta-item strong {
+    color: #fff;
+    margin-right: 4px;
+}
+
+.servers-list,
+.downloads-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.server-btn,
+.download-btn {
+    background: var(--card2);
+    border: 1px solid #2a2d3a;
+    color: #ddd;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+}
+
+.server-btn:hover,
+.download-btn:hover {
+    border-color: var(--accent);
+    color: white;
+}
+
+.server-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.download-btn {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 /* ========== FOOTER ========== */
 footer {
     border-top: 1px solid #1c1e27;
