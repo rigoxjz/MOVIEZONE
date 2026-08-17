@@ -1193,132 +1193,7 @@ function extraerEpisodios(pagina, paginaBase) {
 
     return episodios;
 }
-// ======================================================
-// PROCESAR PÁGINA
-// ======================================================
-async function procesarPagina(link) {
-    const pagina =
-        await obtener(link);
-    const nombre =
-        extraerTitulo(
-            pagina,
-            link
-        );
-    const portada =
-        extraerPortada(
-            pagina,
-            link
-        );
-    const descripcion =
-        extraerDescripcion(
-            pagina
-        );
-    const tipo =
-        detectarTipo(
-            link,
-            nombre || ""
-        );
-    let reproductor =
-        await extraerReproductor(
-            link,
-            pagina
-        );
 
-    let soloTrailer = false;
-    if (esYouTube(reproductor)) {
-        soloTrailer = true;
-    }
-
-    const episodios =
-        extraerEpisodios(
-            pagina,
-            link
-        );
-    let year = null;
-    let genero = null;
-    pagina(
-        'script[type="application/ld+json"]'
-    ).each((_, script) => {
-        try {
-            const raw =
-                pagina(script).html();
-            if (!raw) return;
-            const data =
-                JSON.parse(raw);
-            const objetos =
-                Array.isArray(data)
-                    ? data
-                    : (
-                        data &&
-                        typeof data ===
-                            "object"
-                    )
-                        ? (
-                            data["@graph"] ||
-                            [data]
-                        )
-                        : [];
-            for (const obj of objetos) {
-                if (
-                    !obj ||
-                    typeof obj !==
-                        "object"
-                ) {
-                    continue;
-                }
-                if (
-                    !year &&
-                    obj.dateCreated
-                ) {
-                    year =
-                        String(
-                            obj.dateCreated
-                        ).substring(0, 4);
-                }
-                if (
-                    !year &&
-                    obj.datePublished
-                ) {
-                    year =
-                        String(
-                            obj.datePublished
-                        ).substring(0, 4);
-                }
-                if (
-                    !genero &&
-                    obj.genre
-                ) {
-                    genero =
-                        Array.isArray(
-                            obj.genre
-                        )
-                            ? obj.genre.join(", ")
-                            : obj.genre;
-                }
-            }
-        } catch {}
-    });
-
-    let nombreFinal = nombre;
-    if (soloTrailer && nombreFinal) {
-        nombreFinal = `${nombreFinal} (Solo trailer - No disponible)`;
-    } else if (soloTrailer) {
-        nombreFinal = "Película no disponible (Solo trailer)";
-    }
-
-    return {
-        nombre: nombreFinal,
-        portada,
-        descripcion,
-        year,
-        genero,
-        tipo,
-        link,
-        reproductor,
-        soloTrailer,
-        episodios
-    };
-}
 // ======================================================
 // PROCESAR EPISODIOS
 // ======================================================
@@ -1431,7 +1306,9 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
 
         // Enriquecer solo los primeros
-        const limiteEnriquecer = Math.min(resultados.length, 12);
+        // Enriquecer solo los primeros (para que las cards muestren "Disponible" de una vez).
+// El detalle completo se carga aparte, bajo demanda, vía /api/detalle cuando el usuario abre el item.
+        const limiteEnriquecer = Math.min(resultados.length, 6);
         for (let i = 0; i < limiteEnriquecer; i++) {
             try {
                 resultados[i] = await enriquecerItem(resultados[i]);
