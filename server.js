@@ -75,6 +75,17 @@ async function obtenerHTML(url) {
     const respuesta = await session.get(url);
     return respuesta.data;
 }
+
+function esYouTube(url) {
+    if (!url) return false;
+    const u = String(url).toLowerCase();
+    return (
+        u.includes("youtube.com") ||
+        u.includes("youtu.be") ||
+        u.includes("youtube-nocookie.com")
+    );
+}
+
 // ======================================================
 // TIPO
 // ======================================================
@@ -220,134 +231,131 @@ function extraerTitulo(pagina, link) {
     return nombre;
 }
 // ======================================================
-// PORTADA
+// PORTADA (mejorada)
 // ======================================================
 function extraerPortada(pagina, link) {
-    let portada = null;
-    // JSON-LD
-    pagina(
-        'script[type="application/ld+json"]'
-    ).each((_, script) => {
-        if (portada) return;
+    const candidatos = [];
+
+    function agregar(urlImg) {
+        if (!urlImg) return;
         try {
-            const raw =
-                pagina(script).html();
+            let limpia = String(urlImg).trim();
+            // Limpiar srcset (tomar la primera URL)
+            if (limpia.includes(" ")) {
+                limpia = limpia.split(/\s+/)[0];
+            }
+            // Quitar posibles query de tamaño raro
+            const absoluta = unirUrl(link, limpia);
+            if (!absoluta) return;
+            if (!candidatos.includes(absoluta)) {
+                candidatos.push(absoluta);
+            }
+        } catch {}
+    }
+
+    // 1. JSON-LD
+    pagina('script[type="application/ld+json"]').each((_, script) => {
+        try {
+            const raw = pagina(script).html();
             if (!raw) return;
-            const data =
-                JSON.parse(raw);
+            const data = JSON.parse(raw);
             let objetos = [];
             if (Array.isArray(data)) {
                 objetos = data;
-            } else if (
-                data &&
-                typeof data === "object"
-            ) {
-                objetos =
-                    data["@graph"] ||
-                    [data];
+            } else if (data && typeof data === "object") {
+                objetos = data["@graph"] || [data];
             }
             for (const obj of objetos) {
-                if (
-                    !obj ||
-                    typeof obj !== "object"
-                ) {
-                    continue;
+                if (!obj || typeof obj !== "object") continue;
+                if (obj["@type"] === "ImageObject") {
+                    agregar(obj.contentUrl || obj.url);
                 }
-                if (
-                    obj["@type"] ===
-                    "ImageObject"
-                ) {
-                    portada =
-                        obj.contentUrl ||
-                        obj.url ||
-                        null;
+                if (typeof obj.image === "string") {
+                    agregar(obj.image);
                 }
-                if (
-                    !portada &&
-                    typeof obj.image ===
-                        "string"
-                ) {
-                    portada = obj.image;
+                if (obj.image && typeof obj.image === "object") {
+                    agregar(obj.image.url || obj.image.contentUrl);
                 }
-                if (
-                    !portada &&
-                    obj.image &&
-                    typeof obj.image ===
-                        "object"
-                ) {
-                    portada =
-                        obj.image.url ||
-                        obj.image.contentUrl ||
-                        null;
-                }
-                if (!portada) {
-                    portada =
-                        obj.thumbnailUrl ||
-                        null;
-                }
-                if (portada) break;
+                agregar(obj.thumbnailUrl);
             }
         } catch {}
     });
-    // OG IMAGE
-    if (!portada) {
-        portada =
-            pagina(
-                'meta[property="og:image"]'
-            ).attr("content") || null;
-    }
-    // TWITTER IMAGE
-    if (!portada) {
-        portada =
-            pagina(
-                'meta[name="twitter:image"]'
-            ).attr("content") || null;
-    }
-    // META IMAGE
-    if (!portada) {
-        portada =
-            pagina(
-                'meta[name="image"]'
-            ).attr("content") || null;
-    }
-    // IMÁGENES
-    if (!portada) {
-        pagina("img").each((_, img) => {
-            if (portada) return;
-            const elemento =
-                pagina(img);
-            const posibles = [
-                elemento.attr("src"),
-                elemento.attr("data-src"),
-                elemento.attr("data-lazy-src"),
-                elemento.attr("data-original"),
-                elemento.attr("data-lazyload")
-            ];
-            for (const imagen of posibles) {
-                if (!imagen) continue;
-                const texto =
-                    imagen.toLowerCase();
-                if (
-                    texto.includes("logo") ||
-                    texto.includes("avatar") ||
-                    texto.includes("icon") ||
-                    texto.includes("banner") ||
-                    texto.includes("placeholder") ||
-                    texto.includes("loading")
-                ) {
-                    continue;
-                }
-                portada = imagen;
-                break;
+
+    // 2. Metas
+    agregar(pagina('meta[property="og:image"]').attr("content"));
+    agregar(pagina('meta[property="og:image:secure_url"]').attr("content"));
+    agregar(pagina('meta[name="twitter:image"]').attr("content"));
+    agregar(pagina('meta[name="twitter:image:src"]').attr("content"));
+    agregar(pagina('meta[name="image"]').attr("content"));
+    agregar(pagina('meta[itemprop="image"]').attr("content"));
+
+    // 3. Imágenes del DOM
+    pagina("img").each((_, img) => {
+        const el = pagina(img);
+        const posibles = [
+            el.attr("src"),
+            el.attr("data-src"),
+            el.attr("data-lazy-src"),
+            el.attr("data-original"),
+            el.attr("data-lazyload"),
+            el.attr("data-srcset"),
+            el.attr("srcset")
+        ];
+        for (const imagen of posibles) {
+            if (!imagen) continue;
+            const texto = imagen.toLowerCase();
+            // Filtrar basura
+            if (
+                texto.includes("logo") ||
+                texto.includes("avatar") ||
+                texto.includes("icon") ||
+                texto.includes("banner") ||
+                texto.includes("placeholder") ||
+                texto.includes("loading") ||
+                texto.includes("spinner") ||
+                texto.includes("1x1") ||
+                texto.includes("pixel")
+            ) {
+                continue;
             }
-        });
+            agregar(imagen);
+        }
+    });
+
+    // 4. Background-image en estilos
+    pagina("[style*='background']").each((_, el) => {
+        const style = pagina(el).attr("style") || "";
+        const match = style.match(/url\(['"]?([^'")\s]+)['"]?\)/i);
+        if (match) {
+            agregar(match[1]);
+        }
+    });
+
+    // Si no hay candidatos, devolver placeholder
+    if (candidatos.length === 0) {
+        return "https://via.placeholder.com/300x450/111111/ffffff?text=Sin+Portada";
     }
-    if (portada) {
-        portada =
-            unirUrl(link, portada);
-    }
-    return portada;
+
+    // Priorizar: image.tmdb.org > poster/cover keywords > el resto
+    candidatos.sort((a, b) => {
+        const aLow = a.toLowerCase();
+        const bLow = b.toLowerCase();
+
+        const score = (u) => {
+            let s = 0;
+            if (u.includes("image.tmdb.org") || u.includes("tmdb.org")) s += 100;
+            if (u.includes("poster") || u.includes("cover") || u.includes("portada")) s += 50;
+            if (u.includes("/w500/") || u.includes("/w300/") || u.includes("/original/")) s += 30;
+            if (u.includes(".jpg") || u.includes(".jpeg") || u.includes(".webp") || u.includes(".png")) s += 10;
+            return s;
+        };
+
+        return score(bLow) - score(aLow);
+    });
+
+    return candidatos[0];
 }
+
 // ======================================================
 // DESCRIPCIÓN
 // ======================================================
@@ -798,11 +806,20 @@ async function procesarPagina(link) {
             link,
             nombre || ""
         );
-    const reproductor =
+    let reproductor =
         await extraerReproductor(
             link,
             pagina
         );
+
+    // Detectar si solo es trailer de YouTube
+    let soloTrailer = false;
+    if (esYouTube(reproductor)) {
+        soloTrailer = true;
+        // Se deja el enlace de YouTube para que se pueda ver el trailer
+        // pero se marca claramente
+    }
+
     const episodios =
         extraerEpisodios(
             pagina,
@@ -873,8 +890,17 @@ async function procesarPagina(link) {
             }
         } catch {}
     });
+
+    // Si es solo trailer, ajustar el nombre para que se note
+    let nombreFinal = nombre;
+    if (soloTrailer && nombreFinal) {
+        nombreFinal = `${nombreFinal} (Solo trailer - No disponible)`;
+    } else if (soloTrailer) {
+        nombreFinal = "Película no disponible (Solo trailer)";
+    }
+
     return {
-        nombre,
+        nombre: nombreFinal,
         portada,
         descripcion,
         year,
@@ -882,6 +908,7 @@ async function procesarPagina(link) {
         tipo,
         link,
         reproductor,
+        soloTrailer,
         episodios
     };
 }
@@ -905,27 +932,34 @@ async function procesarEpisodios(item) {
                 await obtener(
                     episodio.link
                 );
-            const reproductor =
+            let reproductor =
                 await extraerReproductor(
                     episodio.link,
                     pagina
                 );
+
+            let soloTrailer = false;
+            if (esYouTube(reproductor)) {
+                soloTrailer = true;
+            }
+
+            let nombreEp = episodio.nombre;
+            if (soloTrailer) {
+                nombreEp = `${nombreEp} (Solo trailer)`;
+            }
+
             episodios.push({
-                nombre:
-                    episodio.nombre,
-                link:
-                    episodio.link,
-                video:
-                    reproductor
+                nombre: nombreEp,
+                link: episodio.link,
+                video: reproductor,
+                soloTrailer
             });
         } catch {
             episodios.push({
-                nombre:
-                    episodio.nombre,
-                link:
-                    episodio.link,
-                video:
-                    null
+                nombre: episodio.nombre,
+                link: episodio.link,
+                video: null,
+                soloTrailer: false
             });
         }
     }
