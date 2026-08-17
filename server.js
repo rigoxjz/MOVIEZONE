@@ -28,6 +28,8 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const GITHUB_DATA_URL = process.env.GITHUB_DATA_URL || "";
 
 // Set de links que ya existen en el JSON de GitHub
+// Base de datos en memoria (cargada desde GitHub)
+let moviesDB = [];
 let knownLinks = new Set();
 
 async function cargarDatosGitHub() {
@@ -36,12 +38,16 @@ async function cargarDatosGitHub() {
         return;
     }
     try {
-        const res = await session.get(GITHUB_DATA_URL, { timeout: 10000 });
+        const res = await session.get(GITHUB_DATA_URL, { timeout: 15000 });
         const data = Array.isArray(res.data) ? res.data : [];
+        
+        moviesDB = data;
         knownLinks = new Set(data.map(item => item.link).filter(Boolean));
-        console.log(`GitHub: ${knownLinks.size} items conocidos cargados`);
+        
+        console.log(`GitHub DB cargada: ${moviesDB.length} items`);
     } catch (err) {
         console.error("No se pudo cargar JSON de GitHub:", err.message);
+        moviesDB = [];
         knownLinks = new Set();
     }
 }
@@ -1053,11 +1059,8 @@ async function procesarEpisodios(item) {
 // ======================================================
 // BUSCAR / LISTAR
 // ======================================================
-async function buscar(
-    termino,
-    seccion = null
-) {
-    // Generar clave de cache
+async function buscar(termino, seccion = null) {
+    // Generar clave de cache temporal
     let cacheKey;
     if (termino) {
         cacheKey = "search_" + termino.toLowerCase().trim().replace(/\s+/g, "_");
@@ -1065,186 +1068,106 @@ async function buscar(
         cacheKey = seccion || "peliculas";
     }
 
-    // Intentar leer del cache
+    // 1. Primero intentamos el cache temporal (/tmp)
     const cached = await getCache(cacheKey);
     if (cached) {
-        console.log("Cache hit:", cacheKey);
+        console.log("Cache hit (tmp):", cacheKey);
         return cached;
     }
 
-    console.log("Cache miss:", cacheKey);
+    // 2. Si es catálogo (películas / series / animes) → usamos la base de datos de GitHub
+    if (!termino && moviesDB.length > 0) {
+        let filtrados = moviesDB;
+
+        if (seccion === "series") {
+            filtrados = moviesDB.filter(item => item.tipo === "Serie");
+        } else if (seccion === "animes") {
+            filtrados = moviesDB.filter(item => item.tipo === "Anime");
+        } else if (seccion === "peliculas") {
+            filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
+        }
+
+        if (filtrados.length > 0) {
+            console.log(`Sirviendo desde GitHub DB (${seccion || "peliculas"}): ${filtrados.length} items`);
+            // Guardamos también en cache temporal para que sea más rápido después
+            await setCache(cacheKey, filtrados);
+            return filtrados;
+        }
+    }
+
+    // 3. Si llegamos aquí → hay que scrapear (búsqueda libre o base de datos vacía)
+    console.log("Cache miss + GitHub vacío o búsqueda libre → scrapeando...");
 
     let url;
     if (termino) {
-        url =
-            BASE +
-            "/?s=" +
-            encodeURIComponent(
-                termino
-            );
+        url = BASE + "/?s=" + encodeURIComponent(termino);
     } else {
         if (seccion === "series") {
-            url =
-                BASE +
-                "/series/";
-        } else if (
-            seccion === "animes"
-        ) {
-            url =
-                BASE +
-                "/animes/";
+            url = BASE + "/series/";
+        } else if (seccion === "animes") {
+            url = BASE + "/animes/";
         } else {
-            url =
-                BASE +
-                "/peliculas/";
+            url = BASE + "/peliculas/";
         }
     }
-    console.log(
-        "Consultando:",
-        url
-    );
-    const pagina =
-        await obtener(url);
-    const links =
-        new Set();
-    pagina("a[href]").each(
-        (_, elemento) => {
-            let href =
-                pagina(elemento)
-                    .attr("href");
-            if (!href) return;
-            try {
-                href =
-                    unirUrl(
-                        BASE,
-                        href
-                    );
-                href =
-                    limpiarUrl(
-                        href
-                    );
-            } catch {
-                return;
-            }
-            if (!href) return;
-            const esPelicula =
-                href.startsWith(
-                    BASE +
-                    "/peliculas/"
-                );
-            const esSerie =
-                href.startsWith(
-                    BASE +
-                    "/series/"
-                );
-            const esAnime =
-                href.startsWith(
-                    BASE +
-                    "/animes/"
-                );
-            if (
-                !esPelicula &&
-                !esSerie &&
-                !esAnime
-            ) {
-                return;
-            }
-            if (
-                href ===
-                    limpiarUrl(
-                        BASE +
-                        "/peliculas/"
-                    ) ||
-                href ===
-                    limpiarUrl(
-                        BASE +
-                        "/series/"
-                    ) ||
-                href ===
-                    limpiarUrl(
-                        BASE +
-                        "/animes/"
-                    )
-            ) {
-                return;
-            }
-            if (
-                /\/page\/\d+\/?$/.test(
-                    href
-                )
-            ) {
-                return;
-            }
-            if (
-                !termino &&
-                seccion === "peliculas" &&
-                !esPelicula
-            ) {
-                return;
-            }
-            if (
-                !termino &&
-                seccion === "series" &&
-                !esSerie
-            ) {
-                return;
-            }
-            if (
-                !termino &&
-                seccion === "animes" &&
-                !esAnime
-            ) {
-                return;
-            }
-            links.add(href);
-        }
-    );
-    const lista =
-        Array.from(links).sort();
-    const resultados = [];
-    const limite =
-        Math.min(
-            lista.length,
-            30
-        );
-    for (
-        let i = 0;
-        i < limite;
-        i++
-    ) {
+
+    console.log("Consultando:", url);
+    const pagina = await obtener(url);
+    const links = new Set();
+
+    pagina("a[href]").each((_, elemento) => {
+        let href = pagina(elemento).attr("href");
+        if (!href) return;
         try {
-            let item =
-                await procesarPagina(
-                    lista[i]
-                );
-            if (
-                item.tipo === "Serie" ||
-                item.tipo === "Anime"
-            ) {
-                item =
-                    await procesarEpisodios(
-                        item
-                    );
+            href = unirUrl(BASE, href);
+            href = limpiarUrl(href);
+        } catch {
+            return;
+        }
+        if (!href) return;
+
+        const esPelicula = href.startsWith(BASE + "/peliculas/");
+        const esSerie = href.startsWith(BASE + "/series/");
+        const esAnime = href.startsWith(BASE + "/animes/");
+
+        if (!esPelicula && !esSerie && !esAnime) return;
+
+        if (
+            href === limpiarUrl(BASE + "/peliculas/") ||
+            href === limpiarUrl(BASE + "/series/") ||
+            href === limpiarUrl(BASE + "/animes/")
+        ) return;
+
+        if (/\/page\/\d+\/?$/.test(href)) return;
+
+        if (!termino && seccion === "peliculas" && !esPelicula) return;
+        if (!termino && seccion === "series" && !esSerie) return;
+        if (!termino && seccion === "animes" && !esAnime) return;
+
+        links.add(href);
+    });
+
+    const lista = Array.from(links).sort();
+    const resultados = [];
+    const limite = Math.min(lista.length, 30);
+
+    for (let i = 0; i < limite; i++) {
+        try {
+            let item = await procesarPagina(lista[i]);
+            if (item.tipo === "Serie" || item.tipo === "Anime") {
+                item = await procesarEpisodios(item);
             }
             resultados.push(item);
-            console.log(
-                `[${i + 1}/${limite}] ${
-                    item.nombre ||
-                    lista[i]
-                }`
-            );
+            console.log(`[${i + 1}/${limite}] ${item.nombre || lista[i]}`);
         } catch (error) {
-            console.error(
-                `[ERROR] ${lista[i]}`,
-                error.message
-            );
+            console.error(`[ERROR] ${lista[i]}`, error.message);
         }
     }
 
     // Guardar en cache temporal
     await setCache(cacheKey, resultados);
 
-    // Enviar solo los nuevos a Telegram
+    // Enviar solo los realmente nuevos a Telegram
     await enviarNuevosATelegram(resultados);
 
     return resultados;
