@@ -350,7 +350,10 @@ function mostrarCatalogo(lista, contenedor) {
 
         const tieneVideo =
             Boolean(item.reproductor) ||
-            (Array.isArray(item.episodios) && item.episodios.some(e => e.video));
+            (Array.isArray(item.embeds) && item.embeds.length > 0) ||
+            (Array.isArray(item.episodios) && item.episodios.some(e =>
+                e.video || (Array.isArray(e.embeds) && e.embeds.length > 0)
+            ));
 
         card.innerHTML = `
             <div class="poster-wrap">
@@ -513,7 +516,7 @@ async function seleccionar(item) {
 
         renderEpisodios(item);
     } else {
-        renderServidoresYDescargas(item.embeds, item.downloads, item.reproductor);
+        renderServidoresYDescargas(item.embeds, item.downloads, item.reproductor, item);
     }
 }
 
@@ -565,7 +568,8 @@ function renderEpisodios(item) {
             renderServidoresYDescargas(
                 episodio.embeds || [],
                 episodio.downloads || [],
-                episodio.video
+                episodio.video,
+                item
             );
         });
 
@@ -574,7 +578,129 @@ function renderEpisodios(item) {
 }
 
 // ========== RENDER SERVIDORES + DESCARGAS ==========
-function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl) {
+function detectarNombreServidor(url, fallbackName) {
+    if (!url) return fallbackName || "Servidor";
+    const u = String(url).toLowerCase();
+
+    // Vimeo → MovieZone (como pediste)
+    if (u.includes("vimeo.com") || u.includes("player.vimeo")) return "MovieZone";
+
+    const mapa = [
+        ["goodstream", "GoodstreamOne"],
+        ["streamwish", "StreamWish"],
+        ["filemoon", "Filemoon"],
+        ["voe", "Voe"],
+        ["dood", "Doodstream"],
+        ["doodstream", "Doodstream"],
+        ["streamtape", "Streamtape"],
+        ["mixdrop", "Mixdrop"],
+        ["upstream", "Upstream"],
+        ["vidmoly", "Vidmoly"],
+        ["mp4upload", "Mp4Upload"],
+        ["ok.ru", "OK"],
+        ["okru", "OK"],
+        ["youtube", "YouTube"],
+        ["youtu.be", "YouTube"],
+        ["mediafire", "Mediafire"],
+        ["mega.nz", "Mega"],
+        ["mega.co", "Mega"],
+        ["drive.google", "Google Drive"],
+        ["pixeldrain", "Pixeldrain"],
+        ["1fichier", "1Fichier"],
+        ["krakenfiles", "Krakenfiles"],
+        ["yourupload", "YourUpload"],
+        ["uqload", "Uqload"],
+        ["vidhide", "Vidhide"],
+        ["lulustream", "LuluStream"],
+        ["filelions", "FileLions"],
+        ["vidguard", "Vidguard"],
+        ["netu", "Netu"],
+        ["hqq", "Netu"],
+        ["waaw", "Netu"],
+        ["supervideo", "SuperVideo"],
+        ["vipss", "Vipss"],
+        ["online", "Online"]
+    ];
+
+    for (const [key, name] of mapa) {
+        if (u.includes(key)) return name;
+    }
+
+    // Si viene un nombre de la API y no es genérico
+    if (fallbackName) {
+        const n = String(fallbackName).trim();
+        if (n && !/^online$/i.test(n) && !/^servidor\s*\d*$/i.test(n)) {
+            return n.charAt(0).toUpperCase() + n.slice(1);
+        }
+    }
+
+    try {
+        const host = new URL(url).hostname.replace(/^www\./, "").split(".")[0];
+        if (host) return host.charAt(0).toUpperCase() + host.slice(1);
+    } catch {}
+
+    return "Servidor";
+}
+
+function formatearLangQuality(lang, quality, itemLangs, itemQualities) {
+    // lang puede ser string o array
+    let langs = [];
+    if (Array.isArray(lang)) langs = lang.filter(Boolean);
+    else if (lang) langs = [String(lang)];
+
+    // Si el embed no trae idioma, usar los del item (sin repetir)
+    if (langs.length === 0 && Array.isArray(itemLangs) && itemLangs.length) {
+        langs = itemLangs.slice(0, 3);
+    }
+
+    let quals = [];
+    if (Array.isArray(quality)) quals = quality.filter(Boolean);
+    else if (quality) quals = [String(quality)];
+
+    if (quals.length === 0 && Array.isArray(itemQualities) && itemQualities.length) {
+        quals = [itemQualities[0]];
+    }
+
+    const langPart = langs.length ? langs.join(" - ") : "";
+    const qualPart = quals.length ? quals.join(" / ") : "";
+
+    if (langPart && qualPart) return `${langPart} | ${qualPart}`;
+    if (langPart) return langPart;
+    if (qualPart) return qualPart;
+    return "";
+}
+
+function labelServidor(embed, index, item) {
+    const url = embed.url || "";
+    const nombre = detectarNombreServidor(url, embed.server || embed.name);
+    const extra = formatearLangQuality(
+        embed.lang || embed.language || embed.idioma,
+        embed.quality || embed.calidad,
+        item?.idiomas,
+        item?.calidad
+    );
+
+// Formato: [GoodstreamOne] Latino - Inglés | HD 720p
+    return extra ? `[${nombre}] ${extra}` : `[${nombre}]`;
+}
+
+function labelDescarga(dl, index, item) {
+    const url = dl.url || dl.link || (typeof dl === "string" ? dl : "");
+    const nombre = detectarNombreServidor(url, dl.server || dl.name || dl.host);
+    const extra = formatearLangQuality(
+        dl.lang || dl.language || dl.idioma,
+        dl.quality || dl.calidad,
+        item?.idiomas,
+        item?.calidad
+    );
+    let label = extra ? `[${nombre}] ${extra}` : `[${nombre}]`;
+    if (dl.size) label += ` (${dl.size})`;
+    return label;
+}
+
+// ========== RENDER SERVIDORES + DESCARGAS ==========
+function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRef) {
+    const item = itemRef || seleccionActual || {};
     const serversSection = document.getElementById("servers-section");
     const serversContainer = document.getElementById("servers-container");
     const downloadsSection = document.getElementById("downloads-section");
@@ -589,7 +715,7 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl) {
     if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
         embeds = embedsRaw.filter(e => e && e.url);
     } else if (fallbackUrl) {
-        embeds = [{ url: fallbackUrl, server: "Servidor 1" }];
+        embeds = [{ url: fallbackUrl, server: "Servidor" }];
     }
 
     if (embeds.length > 0) {
@@ -598,15 +724,7 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl) {
         embeds.forEach((embed, index) => {
             const btn = document.createElement("button");
             btn.className = "server-btn" + (index === 0 ? " active" : "");
-
-            // Label completo: [server] lang | quality
-            const parts = [];
-            if (embed.server) parts.push(`[${embed.server}]`);
-            if (embed.lang) parts.push(embed.lang);
-            if (embed.quality) parts.push(embed.quality);
-            const label = parts.length ? parts.join(" | ") : (embed.name || `Servidor ${index + 1}`);
-
-            btn.textContent = label;
+            btn.textContent = labelServidor(embed, index, item);
 
             btn.addEventListener("click", () => {
                 serversContainer.querySelectorAll(".server-btn").forEach(b => b.classList.remove("active"));
@@ -617,13 +735,12 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl) {
             serversContainer.appendChild(btn);
         });
 
-// Activamos el primero automáticamente
         player.src = embeds[0].url;
     } else {
-        serversSection.style.display = "none";
-        // Solo mensaje, sin botón "Pídelo ya"
-        serversContainer.innerHTML = `<div style="color:#999;padding:12px 0;">Este contenido todavía no está disponible</div>`;
+        // Solo este mensaje. SIN enlace de Telegram.
         serversSection.style.display = "block";
+        serversContainer.innerHTML = `<div style="color:#999;padding:12px 0;">Este contenido todavía no está disponible</div>`;
+        player.src = "about:blank";
     }
 
     // Descargas
@@ -640,16 +757,7 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl) {
             a.href = url;
             a.target = "_blank";
             a.rel = "noopener noreferrer";
-
-            // Label completo: [server] lang | quality (size)
-            const parts = [];
-            if (dl.server) parts.push(`[${dl.server}]`);
-            if (dl.lang) parts.push(dl.lang);
-            if (dl.quality) parts.push(dl.quality);
-            let label = parts.length ? parts.join(" | ") : (dl.name || `Descarga ${index + 1}`);
-            if (dl.size) label += ` (${dl.size})`;
-
-            a.innerHTML = `⬇ ${escapeHtml(label)}`;
+            a.innerHTML = `⬇ ${escapeHtml(labelDescarga(dl, index, item))}`;
             downloadsContainer.appendChild(a);
         });
     } else {
