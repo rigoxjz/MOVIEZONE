@@ -11,9 +11,33 @@ const supabase = createClient(
     process.env.SUPABASE_KEY || ""
 );
 const PORT = process.env.PORT || 3000;
-const BASE =
-    process.env.SOURCE_URL ||
-    "https://www.hackstore.fo";
+
+
+const BASE = process.env.SOURCE_URL || "https://lamovie.org";
+const API  = "https://lamovie.org/wp-api/v1";
+const IMG  = "https://lamovie.org/wp-content/uploads";
+
+const GENRES = {
+    17: "Drama", 18: "Comedia", 33: "Suspense", 32: "Acción", 520: "Animación",
+    96: "Terror", 180: "Crimen", 130: "Aventura", 398: "Familia", 115: "Romance",
+    97: "Misterio", 131: "Ciencia ficción", 229: "Fantasía", 164: "Documental",
+    165: "Historia", 8: "Música", 6787: "Película de TV", 3056: "Bélica", 674: "Western", 703: "Kids"
+};
+const QUALITIES = {
+    495: "Full HD", 496: "Dual 1080p", 88953: "HD 720p", 58679: "BDRip",
+    58681: "HDTV", 59268: "Dual 720p", 649: "HD", 58683: "WEB-DL 720p",
+    53691: "DVDRip", 58678: "WEB-DL 1080p", 88954: "4K Ultra HD",
+    69831: "WEB-DL 4k", 49673: "1080P", 82756: "4K HDR"
+};
+const LANGS = {
+    58651: "Latino", 58652: "Inglés", 58654: "Japonés", 58655: "Subtitulado",
+    58653: "Castellano", 58667: "Coreano", 58661: "Portugués"
+};
+const YEARS = {
+    4: "2025", 1461: "2022", 2236: "2023", 74006: "2026", 2169: "2021",
+    1354: "2024", 2792: "2020", 1816: "2019", 1926: "2018", 1874: "2017"
+};
+
 const HEADERS = {
     "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36",
@@ -219,6 +243,167 @@ async function obtener(url) {
 async function obtenerHTML(url) {
     const respuesta = await session.get(url);
     return respuesta.data;
+}
+
+function resolveIds(ids, mapping) {
+    if (!ids) return [];
+    if (!Array.isArray(ids)) ids = [ids];
+    return ids.map(i => mapping[parseInt(i)] || String(i)).filter(Boolean);
+}
+
+function formatItem(p) {
+    const images = p.images || {};
+    let poster = images.poster || "";
+    if (poster && !poster.startsWith("http")) poster = IMG + poster;
+
+    let backdrop = images.backdrop || "";
+    if (backdrop && !backdrop.startsWith("http")) backdrop = IMG + backdrop;
+
+    const tipoRaw = p.type || "";
+    let tipo = "Película";
+    let link = null;
+
+    if (tipoRaw === "movies") {
+        tipo = "Película";
+        link = `${BASE}/peliculas/${p.slug}/`;
+    } else if (tipoRaw === "tvshows") {
+        tipo = "Serie";
+        link = `${BASE}/series/${p.slug}/`;
+    } else if (tipoRaw === "animes") {
+        tipo = "Anime";
+        link = `${BASE}/animes/${p.slug}/`;
+    }
+
+    const yearArr = resolveIds(p.years, YEARS);
+    const year = yearArr[0] || (p.release_date ? String(p.release_date).substring(0, 4) : null);
+
+    return {
+        id: p._id,
+        nombre: p.title || "Sin título",
+        titulo_original: p.original_title || null,
+        slug: p.slug,
+        tipo,
+        descripcion: p.overview || "",
+        portada: poster || null,
+        backdrop: backdrop || null,
+        year,
+        genero: resolveIds(p.genres, GENRES).join(", ") || null,
+        idiomas: resolveIds(p.lang, LANGS),
+        calidad: resolveIds(p.quality, QUALITIES),
+        calificacion: p.rating || p.imdb_rating || null,
+        link,
+        reproductor: null,
+        downloads: [],
+        soloTrailer: false,
+        episodios: [],
+        postId: p._id
+    };
+}
+
+async function apiGet(url) {
+    const res = await session.get(url, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+            "Accept": "application/json"
+        },
+        timeout: 25000
+    });
+    return res.data;
+}
+
+async function listSection(section = "movies", page = 1, perPage = 24) {
+    const postType = section === "series" || section === "tvshows" ? "tvshows"
+                   : section === "animes" || section === "anime" ? "animes"
+                   : "movies";
+
+    const url = `${API}/listing/${postType}?page=${page}&orderBy=latest&order=desc&postType=${postType}&postsPerPage=${perPage}`;
+    const data = await apiGet(url);
+    const posts = data?.data?.posts || [];
+    return posts.map(formatItem);
+}
+
+async function searchApi(query, perPage = 20) {
+    const q = encodeURIComponent(query);
+    const url = `${API}/search?postType=any&q=${q}&postsPerPage=${perPage}`;
+    const data = await apiGet(url);
+    let posts = data?.data?.posts || data?.data || [];
+    if (!Array.isArray(posts)) posts = [];
+    return posts.map(formatItem);
+}
+
+async function getPlayer(postId) {
+    try {
+        const url = `${API}/player?postId=${postId}&demo=0`;
+        const data = await apiGet(url);
+        const embeds = data?.data?.embeds || [];
+        const downloads = data?.data?.downloads || [];
+
+        // Priorizamos el primer embed bueno
+        let reproductor = null;
+        for (const e of embeds) {
+            if (e.url && !e.url.includes("youtube.com") && !e.url.includes("youtu.be")) {
+                reproductor = e.url;
+                break;
+            }
+        }
+        // Si solo hay YouTube, lo usamos igual
+        if (!reproductor && embeds.length > 0) {
+            reproductor = embeds[0].url;
+        }
+
+        return { reproductor, embeds, downloads };
+    } catch (err) {
+        console.error("Error getPlayer:", err.message);
+        return { reproductor: null, embeds: [], downloads: [] };
+    }
+}
+
+async function getEpisodes(serieId, season = 1) {
+    try {
+        const url = `${API}/single/episodes/list?_id=${serieId}&season=${season}&page=1&postsPerPage=50`;
+        const data = await apiGet(url);
+        return data?.data || {};
+    } catch {
+        return {};
+    }
+}
+
+async function enriquecerItem(item) {
+    if (!item.postId) return item;
+
+    // Obtener reproductor y descargas
+    const playerData = await getPlayer(item.postId);
+    item.reproductor = playerData.reproductor;
+    item.downloads = playerData.downloads || [];
+    item.embeds = playerData.embeds || [];
+
+    if (item.reproductor && (item.reproductor.includes("youtube.com") || item.reproductor.includes("youtu.be"))) {
+        item.soloTrailer = true;
+        if (item.nombre && !item.nombre.includes("Solo trailer")) {
+            item.nombre = `${item.nombre} (Solo trailer - No disponible)`;
+        }
+    }
+
+    // Si es serie o anime → cargar episodios de la temporada 1
+    if (item.tipo === "Serie" || item.tipo === "Anime") {
+        const epData = await getEpisodes(item.postId, 1);
+        const posts = epData.posts || [];
+
+        item.episodios = [];
+
+        for (const ep of posts) {
+            const epPlayer = await getPlayer(ep._id);
+            item.episodios.push({
+                nombre: ep.title || `T${ep.season_number}E${ep.episode_number}`,
+                link: null,
+                video: epPlayer.reproductor || null,
+                downloads: epPlayer.downloads || [],
+                soloTrailer: epPlayer.reproductor ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be")) : false
+            });
+        }
+    }
+
+    return item;
 }
 
 function esYouTube(url) {
@@ -1107,7 +1292,6 @@ async function procesarEpisodios(item) {
 // BUSCAR / LISTAR
 // ======================================================
 async function buscar(termino, seccion = null) {
-    // Generar clave de cache temporal
     let cacheKey;
     if (termino) {
         cacheKey = "search_" + termino.toLowerCase().trim().replace(/\s+/g, "_");
@@ -1115,30 +1299,69 @@ async function buscar(termino, seccion = null) {
         cacheKey = seccion || "peliculas";
     }
 
-    // 1. Primero intentamos el cache temporal (/tmp)
+    // 1. Cache temporal
     const cached = await getCache(cacheKey);
     if (cached) {
         console.log("Cache hit (tmp):", cacheKey);
         return cached;
     }
 
-// 2. Si es catálogo → usamos Supabase
-if (!termino && moviesDB.length > 0) {
-    let filtrados = moviesDB;
+    // 2. Base de datos Supabase
+    if (!termino && moviesDB.length > 0) {
+        let filtrados = moviesDB;
 
-    if (seccion === "series") {
-        filtrados = moviesDB.filter(item => item.tipo === "Serie");
-    } else if (seccion === "animes" || seccion === "anime") {
-        filtrados = moviesDB.filter(item => item.tipo === "Anime");
-    } else {
-        filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
+        if (seccion === "series") {
+            filtrados = moviesDB.filter(item => item.tipo === "Serie");
+        } else if (seccion === "animes" || seccion === "anime") {
+            filtrados = moviesDB.filter(item => item.tipo === "Anime");
+        } else {
+            filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
+        }
+
+        if (filtrados.length > 0) {
+            console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): ${filtrados.length} items`);
+            await setCache(cacheKey, filtrados);
+            return filtrados;
+        }
     }
 
-    if (filtrados.length > 0) {
-        console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): ${filtrados.length} items`);
-        await setCache(cacheKey, filtrados);
-        return filtrados;
+    // 3. Scrape / API nueva
+    console.log("Cache miss + Supabase vacío o búsqueda → usando nueva API...");
+
+    let resultados = [];
+
+    try {
+        if (termino) {
+            resultados = await searchApi(termino, 20);
+        } else {
+            const section = seccion === "series" ? "series"
+                          : (seccion === "animes" || seccion === "anime") ? "animes"
+                          : "peliculas";
+            resultados = await listSection(section, 1, 24);
+        }
+
+        // Enriquecer solo los primeros para no saturar
+        const limite = Math.min(resultados.length, 15);
+        for (let i = 0; i < limite; i++) {
+            try {
+                resultados[i] = await enriquecerItem(resultados[i]);
+                console.log(`[${i + 1}/${limite}] ${resultados[i].nombre}`);
+            } catch (err) {
+                console.error(`Error enriqueciendo ${resultados[i]?.nombre}:`, err.message);
+            }
+        }
+
+    } catch (err) {
+        console.error("Error en buscar:", err.message);
     }
+
+    // Guardar cache temporal
+    await setCache(cacheKey, resultados);
+
+    // Telegram + Supabase (solo los nuevos)
+    await enviarNuevosATelegram(resultados);
+
+    return resultados;
 }
 
     // 3. Si llegamos aquí → hay que scrapear (búsqueda libre o base de datos vacía)
