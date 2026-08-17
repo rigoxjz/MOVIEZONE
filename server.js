@@ -4,6 +4,12 @@ const cheerio = require("cheerio");
 const path = require("path");
 const fs = require("fs").promises;
 const app = express();
+const { createClient } = require("@supabase/supabase-js");
+
+const supabase = createClient(
+    process.env.SUPABASE_URL || "",
+    process.env.SUPABASE_KEY || ""
+);
 const PORT = process.env.PORT || 3000;
 const BASE =
     process.env.SOURCE_URL ||
@@ -29,24 +35,25 @@ const GITHUB_DATA_URL = process.env.GITHUB_DATA_URL || "";
 
 // Set de links que ya existen en el JSON de GitHub
 // Base de datos en memoria (cargada desde GitHub)
+// Base de datos en memoria (cargada desde Supabase)
 let moviesDB = [];
 let knownLinks = new Set();
 
-async function cargarDatosGitHub() {
-    if (!GITHUB_DATA_URL) {
-        console.log("GITHUB_DATA_URL no configurada");
-        return;
-    }
+async function cargarDatosSupabase() {
     try {
-        const res = await session.get(GITHUB_DATA_URL, { timeout: 15000 });
-        const data = Array.isArray(res.data) ? res.data : [];
-        
-        moviesDB = data;
-        knownLinks = new Set(data.map(item => item.link).filter(Boolean));
-        
-        console.log(`GitHub DB cargada: ${moviesDB.length} items`);
+        const { data, error } = await supabase
+            .from("movies")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        moviesDB = data || [];
+        knownLinks = new Set(moviesDB.map(item => item.link).filter(Boolean));
+
+        console.log(`Supabase DB cargada: ${moviesDB.length} items`);
     } catch (err) {
-        console.error("No se pudo cargar JSON de GitHub:", err.message);
+        console.error("No se pudo cargar desde Supabase:", err.message);
         moviesDB = [];
         knownLinks = new Set();
     }
@@ -70,6 +77,44 @@ async function enviarTelegram(texto) {
     }
 }
 
+async function guardarEnSupabase(items) {
+    if (!items || items.length === 0) return;
+
+    const nuevos = items.filter(item => item.link && !knownLinks.has(item.link));
+    if (nuevos.length === 0) return;
+
+    const paraInsertar = nuevos.map(item => ({
+        link: item.link,
+        nombre: item.nombre || null,
+        portada: item.portada || null,
+        descripcion: item.descripcion || null,
+        year: item.year || null,
+        genero: item.genero || null,
+        tipo: item.tipo || "Película",
+        reproductor: item.reproductor || null,
+        solo_trailer: !!item.soloTrailer,
+        episodios: item.episodios || []
+    }));
+
+    try {
+        const { error } = await supabase
+            .from("movies")
+            .upsert(paraInsertar, { onConflict: "link" });
+
+        if (error) throw error;
+
+        // Actualizamos la memoria local
+        paraInsertar.forEach(item => {
+            knownLinks.add(item.link);
+            moviesDB.unshift(item);
+        });
+
+        console.log(`Guardados ${paraInsertar.length} nuevos en Supabase`);
+    } catch (err) {
+        console.error("Error guardando en Supabase:", err.message);
+    }
+}
+
 async function enviarNuevosATelegram(items) {
     if (!items || items.length === 0) return;
 
@@ -78,7 +123,9 @@ async function enviarNuevosATelegram(items) {
         console.log("No hay items nuevos para Telegram");
         return;
     }
-
+// Guardar automáticamente en Supabase
+    await guardarEnSupabase(nuevos);
+    
     // Actualizamos el set local
     nuevos.forEach(item => knownLinks.add(item.link));
 
@@ -1075,25 +1122,24 @@ async function buscar(termino, seccion = null) {
         return cached;
     }
 
-    // 2. Si es catálogo (películas / series / animes) → usamos la base de datos de GitHub
-    if (!termino && moviesDB.length > 0) {
-        let filtrados = moviesDB;
+// 2. Si es catálogo → usamos Supabase
+if (!termino && moviesDB.length > 0) {
+    let filtrados = moviesDB;
 
-        if (seccion === "series") {
-            filtrados = moviesDB.filter(item => item.tipo === "Serie");
-        } else if (seccion === "animes") {
-            filtrados = moviesDB.filter(item => item.tipo === "Anime");
-        } else if (seccion === "peliculas") {
-            filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
-        }
-
-        if (filtrados.length > 0) {
-            console.log(`Sirviendo desde GitHub DB (${seccion || "peliculas"}): ${filtrados.length} items`);
-            // Guardamos también en cache temporal para que sea más rápido después
-            await setCache(cacheKey, filtrados);
-            return filtrados;
-        }
+    if (seccion === "series") {
+        filtrados = moviesDB.filter(item => item.tipo === "Serie");
+    } else if (seccion === "animes" || seccion === "anime") {
+        filtrados = moviesDB.filter(item => item.tipo === "Anime");
+    } else {
+        filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
     }
+
+    if (filtrados.length > 0) {
+        console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): ${filtrados.length} items`);
+        await setCache(cacheKey, filtrados);
+        return filtrados;
+    }
+}
 
     // 3. Si llegamos aquí → hay que scrapear (búsqueda libre o base de datos vacía)
     console.log("Cache miss + GitHub vacío o búsqueda libre → scrapeando...");
@@ -1391,8 +1437,8 @@ app.listen(
             `Fuente: ${BASE}`
         );
 
-        // Cargar lo que ya está guardado en GitHub
-        await cargarDatosGitHub();
+        // Cargar lo que ya está guardado en Supabase
+        await cargarDatosSupabase();
 
         // Aviso de inicio
         await enviarTelegram(`✅ <b>MovieZone iniciado</b>\nPuerto: ${PORT}\nItems conocidos: ${knownLinks.size}`);
