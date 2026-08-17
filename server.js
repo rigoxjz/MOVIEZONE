@@ -2,6 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
 const path = require("path");
+const fs = require("fs").promises;
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BASE =
@@ -18,6 +19,32 @@ const session = axios.create({
     timeout: 20000,
     maxRedirects: 5
 });
+
+// ======================================================
+// CACHE (archivos temporales en /tmp - compatible con Render)
+// ======================================================
+const CACHE_DIR = path.join("/tmp", "moviezone-cache");
+
+async function getCache(key) {
+    try {
+        const file = path.join(CACHE_DIR, `${key}.json`);
+        const data = await fs.readFile(file, "utf8");
+        return JSON.parse(data);
+    } catch {
+        return null;
+    }
+}
+
+async function setCache(key, data) {
+    try {
+        await fs.mkdir(CACHE_DIR, { recursive: true });
+        const file = path.join(CACHE_DIR, `${key}.json`);
+        await fs.writeFile(file, JSON.stringify(data), "utf8");
+    } catch (error) {
+        console.error("Error guardando cache:", error.message);
+    }
+}
+
 // ======================================================
 // UTILIDADES
 // ======================================================
@@ -913,6 +940,23 @@ async function buscar(
     termino,
     seccion = null
 ) {
+    // Generar clave de cache
+    let cacheKey;
+    if (termino) {
+        cacheKey = "search_" + termino.toLowerCase().trim().replace(/\s+/g, "_");
+    } else {
+        cacheKey = seccion || "peliculas";
+    }
+
+    // Intentar leer del cache
+    const cached = await getCache(cacheKey);
+    if (cached) {
+        console.log("Cache hit:", cacheKey);
+        return cached;
+    }
+
+    console.log("Cache miss:", cacheKey);
+
     let url;
     if (termino) {
         url =
@@ -1085,6 +1129,10 @@ async function buscar(
             );
         }
     }
+
+    // Guardar en cache
+    await setCache(cacheKey, resultados);
+
     return resultados;
 }
 // ======================================================
