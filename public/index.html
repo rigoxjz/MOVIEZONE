@@ -12,14 +12,13 @@
     <div class="logo" onclick="mostrarVista('home')">
         MOVIE<span>ZONE</span>
     </div>
-
     <nav>
         <a href="#" data-vista="home" class="active">Inicio</a>
         <a href="#" data-vista="peliculas">Películas</a>
         <a href="#" data-vista="series">Series</a>
         <a href="#" data-vista="anime">Anime</a>
+        <a href="#" data-vista="favoritos">Favoritos</a>
     </nav>
-
     <input id="search" class="search" type="search" placeholder="Buscar..." autocomplete="off">
 </header>
 
@@ -68,6 +67,7 @@
             <span id="peliculas-info">Cargando...</span>
         </div>
         <div class="movies" id="peliculas-container">
+            <div class="paginacion" id="peliculas-paginacion"></div>
             <div class="loading">Cargando películas...</div>
         </div>
     </main>
@@ -81,6 +81,7 @@
             <span id="series-info">Cargando...</span>
         </div>
         <div class="movies" id="series-container">
+            <div class="paginacion" id="series-paginacion"></div>
             <div class="loading">Cargando series...</div>
         </div>
     </main>
@@ -94,6 +95,7 @@
             <span id="anime-info">Cargando...</span>
         </div>
         <div class="movies" id="anime-container">
+            <div class="paginacion" id="series-paginacion"></div>
             <div class="loading">Cargando anime...</div>
         </div>
     </main>
@@ -111,7 +113,19 @@
         </div>
     </main>
 </div>
-
+<!-- ==================== FAVORITOS ==================== -->
+<div id="view-favoritos" class="view">
+    <main>
+        <div class="section-title">
+            <h2>Mis Favoritos</h2>
+            <span id="favoritos-info">0 guardados</span>
+        </div>
+        <div class="movies" id="favoritos-container">
+            <div class="loading">No tienes favoritos todavía.</div>
+        </div>
+    </main>
+</div>
+    
 <!-- ==================== DETALLE ==================== -->
 <div id="view-detail" class="view">
     <main>
@@ -132,9 +146,11 @@
                 </div>
 
                 <p id="detail-description">Descripción...</p>
+                <button id="btn-favorito" class="fav-btn" onclick="toggleFavorito()">☆ Agregar a favoritos</button>
             </div>
         </div>
 
+        
         <!-- SELECTOR DE SERVIDORES / REPRODUCTORES -->
         <div id="servers-section" style="display:none; margin-bottom: 18px;">
             <div class="section-title" style="margin-bottom: 12px;">
