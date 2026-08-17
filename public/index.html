@@ -18,6 +18,7 @@
         <a href="#" data-vista="series">Series</a>
         <a href="#" data-vista="anime">Anime</a>
         <a href="#" data-vista="favoritos">Favoritos</a>
+        <a href="#" data-vista="historial">Historial</a>
     </nav>
     <input id="search" class="search" type="search" placeholder="Buscar..." autocomplete="off">
 </header>
@@ -125,7 +126,22 @@
         </div>
     </main>
 </div>
-    
+
+<!-- ==================== HISTORIAL ==================== -->
+<div id="view-historial" class="view">
+    <main>
+        <div class="section-title">
+            <h2>Historial</h2>
+            <span id="historial-info">0 vistos</span>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <button class="fav-btn" onclick="limpiarHistorial()">🗑 Limpiar historial</button>
+        </div>
+        <div class="movies" id="historial-container">
+            <div class="loading">Todavía no has visto nada.</div>
+        </div>
+    </main>
+</div>
 <!-- ==================== DETALLE ==================== -->
 <div id="view-detail" class="view">
     <main>
