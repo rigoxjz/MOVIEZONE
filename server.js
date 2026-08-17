@@ -3,7 +3,37 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const path = require("path");
 const fs = require("fs").promises;
+const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
 const app = express();
+// ======================================================
+// SEGURIDAD (Helmet + Rate Limit)
+// ======================================================
+app.use(helmet({
+    contentSecurityPolicy: false, // necesario porque usamos iframes de otros dominios
+    crossOriginEmbedderPolicy: false
+}));
+
+// Límite general: 120 peticiones cada 15 minutos por IP
+const limiterGeneral = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Demasiadas peticiones. Espera un momento e inténtalo de nuevo." }
+});
+
+// Límite más estricto para búsqueda
+const limiterBusqueda = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Demasiadas búsquedas. Espera un momento." }
+});
+
+app.use(limiterGeneral);
+
 const { createClient } = require("@supabase/supabase-js");
 
 const supabase = createClient(
@@ -1347,12 +1377,12 @@ async function procesarEpisodios(item) {
 // ======================================================
 // BUSCAR / LISTAR
 // ======================================================
-async function buscar(termino, seccion = null) {
+async function buscar(termino, seccion = null, page = 1, limit = 24) {
     let cacheKey;
     if (termino) {
         cacheKey = "search_" + termino.toLowerCase().trim().replace(/\s+/g, "_");
     } else {
-        cacheKey = seccion || "peliculas";
+        cacheKey = `${seccion || "peliculas"}_p${page}_l${limit}`;
     }
 
     // 1. Cache temporal
@@ -1374,34 +1404,38 @@ async function buscar(termino, seccion = null) {
             filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
         }
 
-        if (filtrados.length > 0) {
-            console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): ${filtrados.length} items`);
-            await setCache(cacheKey, filtrados);
-            return filtrados;
+        // Paginación sobre Supabase
+        const inicio = (page - 1) * limit;
+        const pagina = filtrados.slice(inicio, inicio + limit);
+
+        if (pagina.length > 0) {
+            console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): página ${page}`);
+            await setCache(cacheKey, pagina);
+            return pagina;
         }
     }
 
-    // 3. Scrape / API nueva
+    // 3. API nueva
     console.log("Cache miss + Supabase vacío o búsqueda → usando nueva API...");
 
     let resultados = [];
 
     try {
         if (termino) {
-            resultados = await searchApi(termino, 20);
+            resultados = await searchApi(termino, limit);
         } else {
             const section = seccion === "series" ? "series"
                           : (seccion === "animes" || seccion === "anime") ? "animes"
                           : "peliculas";
-            resultados = await listSection(section, 1, 24);
+            resultados = await listSection(section, page, limit);
         }
 
-        // Enriquecer solo los primeros para no saturar
-        const limite = Math.min(resultados.length, 15);
-        for (let i = 0; i < limite; i++) {
+        // Enriquecer solo los primeros
+        const limiteEnriquecer = Math.min(resultados.length, 12);
+        for (let i = 0; i < limiteEnriquecer; i++) {
             try {
                 resultados[i] = await enriquecerItem(resultados[i]);
-                console.log(`[${i + 1}/${limite}] ${resultados[i].nombre}`);
+                console.log(`[${i + 1}/${limiteEnriquecer}] ${resultados[i].nombre}`);
             } catch (err) {
                 console.error(`Error enriqueciendo ${resultados[i]?.nombre}:`, err.message);
             }
@@ -1411,10 +1445,7 @@ async function buscar(termino, seccion = null) {
         console.error("Error en buscar:", err.message);
     }
 
-    // Guardar cache temporal
     await setCache(cacheKey, resultados);
-
-    // Telegram + Supabase (solo los nuevos)
     await enviarNuevosATelegram(resultados);
 
     return resultados;
@@ -1439,6 +1470,7 @@ process.on("unhandledRejection", async (reason) => {
 // ======================================================
 app.get(
     "/api/buscar",
+    limiterBusqueda,
     async (req, res) => {
         try {
             const termino =
@@ -1477,90 +1509,81 @@ app.get(
 // ======================================================
 // PELÍCULAS
 // ======================================================
-app.get(
-    "/api/catalogo",
-    async (req, res) => {
-        try {
-            const resultados =
-                await buscar(
-                    "",
-                    "peliculas"
-                );
-            res.json({
-                resultados
-            });
-        } catch (error) {
-            console.error(error);
-            await enviarTelegram(`⚠️ Error en /api/catalogo\n${error.message}`);
-            res
-                .status(500)
-                .json({
-                    error:
-                        "No se pudo cargar el catálogo",
-                    detalle:
-                        error.message
-                });
-        }
+// ======================================================
+// PELÍCULAS (con paginación)
+// ======================================================
+app.get("/api/catalogo", async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
+
+        const resultados = await buscar("", "peliculas", page, limit);
+        res.json({
+            resultados,
+            page,
+            limit,
+            total: resultados.length
+        });
+    } catch (error) {
+        console.error(error);
+        await enviarTelegram(`⚠️ Error en /api/catalogo\n${error.message}`);
+        res.status(500).json({
+            error: "No se pudo cargar el catálogo",
+            detalle: error.message
+        });
     }
-);
+});
+
 // ======================================================
-// SERIES
+// SERIES (con paginación)
 // ======================================================
-app.get(
-    "/api/series",
-    async (req, res) => {
-        try {
-            const resultados =
-                await buscar(
-                    "",
-                    "series"
-                );
-            res.json({
-                resultados
-            });
-        } catch (error) {
-            console.error(error);
-            await enviarTelegram(`⚠️ Error en /api/series\n${error.message}`);
-            res
-                .status(500)
-                .json({
-                    error:
-                        "No se pudieron cargar las series",
-                    detalle:
-                        error.message
-                });
-        }
+app.get("/api/series", async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
+
+        const resultados = await buscar("", "series", page, limit);
+        res.json({
+            resultados,
+            page,
+            limit,
+            total: resultados.length
+        });
+    } catch (error) {
+        console.error(error);
+        await enviarTelegram(`⚠️ Error en /api/series\n${error.message}`);
+        res.status(500).json({
+            error: "No se pudieron cargar las series",
+            detalle: error.message
+        });
     }
-);
+});
+
 // ======================================================
-// ANIME
+// ANIME (con paginación)
 // ======================================================
-app.get(
-    "/api/animes",
-    async (req, res) => {
-        try {
-            const resultados =
-                await buscar(
-                    "",
-                    "animes"
-                );
-            res.json({
-                resultados
-            });
-        } catch (error) {
-            console.error(error);
-            await enviarTelegram(`⚠️ Error en /api/animes\n${error.message}`);
-            res
-                .status(500)
-                .json({
-                    error:
-                        "No se pudo cargar el anime",
-                    detalle:
-                        error.message
-                });
-        }
+app.get("/api/animes", async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
+
+        const resultados = await buscar("", "animes", page, limit);
+        res.json({
+            resultados,
+            page,
+            limit,
+            total: resultados.length
+        });
+    } catch (error) {
+        console.error(error);
+        await enviarTelegram(`⚠️ Error en /api/animes\n${error.message}`);
+        res.status(500).json({
+            error: "No se pudo cargar el anime",
+            detalle: error.message
+        });
     }
-);
+});
+
 
 // ======================================================
 // EPISODIOS POR TEMPORADA
