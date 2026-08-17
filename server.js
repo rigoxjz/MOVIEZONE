@@ -1631,6 +1631,57 @@ app.get("/api/episodios", async (req, res) => {
         res.status(500).json({ error: "No se pudieron cargar los episodios", detalle: error.message });
     }
 });
+
+
+
+// ======================================================
+// DETALLE COMPLETO (fuerza enriquecimiento)
+// ======================================================
+app.get("/api/detalle", async (req, res) => {
+    try {
+        const postId = req.query.postId;
+        const link = req.query.link;
+
+        if (!postId && !link) {
+            return res.status(400).json({ error: "Falta postId o link" });
+        }
+
+        // Buscamos el item en memoria / Supabase
+        let item = null;
+
+        if (postId) {
+            item = moviesDB.find(m => String(m.postId) === String(postId) || String(m.id) === String(postId));
+        }
+        if (!item && link) {
+            item = moviesDB.find(m => m.link === link);
+        }
+
+        // Si no está en DB, creamos uno mínimo
+        if (!item) {
+            item = {
+                postId: postId || null,
+                link: link || null,
+                nombre: "Cargando...",
+                tipo: "Película",
+                embeds: [],
+                downloads: [],
+                episodios: [],
+                temporadas: []
+            };
+        }
+
+        // Siempre enriquecemos de nuevo (esto arregla el problema)
+        const enriquecido = await enriquecerItem({ ...item, postId: item.postId || postId });
+
+        // Guardamos la versión completa en Supabase
+        await guardarEnSupabase([enriquecido]);
+
+        res.json(enriquecido);
+    } catch (error) {
+        console.error("Error en /api/detalle:", error.message);
+        res.status(500).json({ error: "No se pudo cargar el detalle", detalle: error.message });
+    }
+});
 // ======================================================
 // FRONTEND
 // ======================================================
@@ -1681,6 +1732,8 @@ app.get(
         );
     }
 );
+
+
 // ======================================================
 // INICIO
 // ======================================================
