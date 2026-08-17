@@ -76,43 +76,47 @@ async function enviarNuevosATelegram(items) {
     // Actualizamos el set local para no reenviar en esta sesión
     nuevos.forEach(item => knownLinks.add(item.link));
 
-    // Función para escapar HTML de Telegram
-    function escapeHtml(text) {
-        if (!text) return "";
-        return String(text)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+    // Creamos un JSON limpio y listo para pegar en movies_saved.json
+    const jsonLimpio = JSON.stringify(nuevos, null, 2);
+
+    // Telegram tiene límite de ~4096 caracteres por mensaje.
+    // Si el JSON es muy grande lo partimos en varios mensajes.
+    const MAX = 3500;
+    const partes = [];
+
+    if (jsonLimpio.length <= MAX) {
+        partes.push(jsonLimpio);
+    } else {
+        // Partimos por objetos aproximadamente
+        let actual = "[\n";
+        for (let i = 0; i < nuevos.length; i++) {
+            const obj = JSON.stringify(nuevos[i], null, 2);
+            if ((actual + obj).length > MAX) {
+                actual = actual.trim().replace(/,$/, "") + "\n]";
+                partes.push(actual);
+                actual = "[\n" + obj + (i < nuevos.length - 1 ? "," : "");
+            } else {
+                actual += obj + (i < nuevos.length - 1 ? ",\n" : "");
+            }
+        }
+        if (actual.length > 3) {
+            actual = actual.trim().replace(/,$/, "") + "\n]";
+            partes.push(actual);
+        }
     }
 
-    // Enviamos de 8 en 8 para no pasarnos del límite de 4096 caracteres
-    const TAMANO_LOTE = 8;
+    // Enviamos cada parte
+    for (let i = 0; i < partes.length; i++) {
+        const encabezado = partes.length > 1
+            ? `📄 <b>Nuevos items (parte ${i + 1}/${partes.length})</b>\nCopia y pega en movies_saved.json:\n\n`
+            : `📄 <b>${nuevos.length} nuevo(s) item(s)</b>\nCopia y pega en movies_saved.json:\n\n`;
 
-    for (let i = 0; i < nuevos.length; i += TAMANO_LOTE) {
-        const lote = nuevos.slice(i, i + TAMANO_LOTE);
-
-        let mensaje = `🎬 <b>${lote.length} nuevo(s) detectado(s)</b> (${i + 1}-${Math.min(i + TAMANO_LOTE, nuevos.length)} de ${nuevos.length})\n\n`;
-
-        for (const item of lote) {
-            mensaje += `<b>${escapeHtml(item.nombre || "Sin título")}</b>\n`;
-            mensaje += `Tipo: ${escapeHtml(item.tipo || "?")}\n`;
-            if (item.soloTrailer) mensaje += `⚠️ Solo trailer (YouTube)\n`;
-            if (item.reproductor) mensaje += `▶ ${escapeHtml(item.reproductor)}\n`;
-            if (item.portada) mensaje += `🖼 ${escapeHtml(item.portada)}\n`;
-            mensaje += `Link: ${escapeHtml(item.link)}\n`;
-            mensaje += `────────────────\n`;
-        }
-
-        // Si por alguna razón todavía es demasiado largo, lo cortamos
-        if (mensaje.length > 4000) {
-            mensaje = mensaje.substring(0, 4000) + "\n...(mensaje recortado)";
-        }
+        const mensaje = encabezado + "<pre>" + partes[i].replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</pre>";
 
         await enviarTelegram(mensaje);
 
-        // Pequeña pausa para no saturar la API de Telegram
-        if (i + TAMANO_LOTE < nuevos.length) {
-            await new Promise(r => setTimeout(r, 600));
+        if (i < partes.length - 1) {
+            await new Promise(r => setTimeout(r, 800));
         }
     }
 }
@@ -811,56 +815,67 @@ async function extraerReproductor(url, $pagina) {
 // ======================================================
 // EPISODIOS
 // ======================================================
-function extraerEpisodios(
-    pagina,
-    paginaBase
-) {
+function extraerEpisodios(pagina, paginaBase) {
     const episodios = [];
     const vistos = new Set();
-    pagina("a[href]").each(
-        (_, elemento) => {
-            const texto =
-                pagina(elemento)
-                    .text()
-                    .trim()
-                    .replace(/\s+/g, " ");
-            const href =
-                pagina(elemento)
-                    .attr("href");
-            if (!href) return;
-            const url =
-                unirUrl(
-                    paginaBase,
-                    href
-                );
-            if (!url) return;
-            const contenido =
-                `${texto} ${url}`
-                    .toLowerCase();
-            const pareceEpisodio =
-                /episodio|episode|capitulo|capítulo|\bep\.?\s*\d+|\b\d+x\d+\b/i
-                    .test(contenido);
-            if (!pareceEpisodio) {
-                return;
-            }
-            if (vistos.has(url)) {
-                return;
-            }
-            if (url === paginaBase) {
-                return;
-            }
-            vistos.add(url);
-            episodios.push({
-                nombre:
-                    texto ||
-                    `Episodio ${
-                        episodios.length + 1
-                    }`,
-                link: url,
-                video: null
-            });
+
+    pagina("a[href]").each((_, elemento) => {
+        let texto = pagina(elemento)
+            .text()
+            .trim()
+            .replace(/\s+/g, " ");
+
+        // Limpiar basura de CSS / SVG que a veces viene en el texto
+        texto = texto
+            .replace(/\.text\s*\{[^}]*\}/gi, "")
+            .replace(/font-size:[^;]+;/gi, "")
+            .replace(/font-weight:[^;]+;/gi, "")
+            .replace(/fill:\s*#[0-9a-f]+;/gi, "")
+            .replace(/dominant-baseline:[^;]+;/gi, "")
+            .replace(/text-anchor:[^;]+;/gi, "")
+            .replace(/\{[^}]*\}/g, "")
+            .trim();
+
+        // Si después de limpiar queda muy sucio, intentar sacar solo el patrón de episodio
+        const match = texto.match(/(\d+\s*[x×]\s*\d+|episodio\s*\d+|ep\.?\s*\d+|capítulo\s*\d+|capitulo\s*\d+)/i);
+        if (match) {
+            texto = match[0].replace(/\s+/g, "");
         }
-    );
+
+        // Si todavía está vacío o es basura, saltamos
+        if (!texto || texto.length < 2 || texto.toLowerCase().includes("disponible")) {
+            // Intentamos usar el href como respaldo para generar nombre
+            const href = pagina(elemento).attr("href") || "";
+            const matchHref = href.match(/(\d+[x×]\d+|episodio[-_]?\d+|ep[-_]?\d+)/i);
+            if (matchHref) {
+                texto = matchHref[0].replace(/[-_]/g, " ");
+            } else {
+                return;
+            }
+        }
+
+        const href = pagina(elemento).attr("href");
+        if (!href) return;
+
+        const url = unirUrl(paginaBase, href);
+        if (!url) return;
+
+        const contenido = `${texto} ${url}`.toLowerCase();
+        const pareceEpisodio = /episodio|episode|capitulo|capítulo|\bep\.?\s*\d+|\b\d+x\d+\b/i.test(contenido);
+
+        if (!pareceEpisodio) return;
+        if (vistos.has(url)) return;
+        if (url === paginaBase) return;
+
+        vistos.add(url);
+
+        episodios.push({
+            nombre: texto || `Episodio ${episodios.length + 1}`,
+            link: url,
+            video: null
+        });
+    });
+
     return episodios;
 }
 // ======================================================
