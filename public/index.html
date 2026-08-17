@@ -1,938 +1,152 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
-
-<title>MovieZone</title>
-
-<style>
-
-* {
-    box-sizing: border-box;
-}
-
-:root {
-    --bg:#08090d;
-    --card:#11131a;
-    --card2:#171922;
-    --text:#fff;
-    --muted:#9ca0ad;
-    --accent:#e50914;
-    --accent-hover:#ff1723;
-}
-
-html {
-    scroll-behavior:smooth;
-}
-
-body {
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-    font-family:Arial,Helvetica,sans-serif;
-}
-
-
-/* =====================================================
-   HEADER
-===================================================== */
-
-header {
-
-    position:sticky;
-    top:0;
-    z-index:100;
-
-    min-height:70px;
-
-    display:flex;
-    align-items:center;
-    gap:30px;
-
-    padding:12px 5%;
-
-    background:rgba(8,9,13,.94);
-
-    backdrop-filter:blur(15px);
-
-    border-bottom:1px solid rgba(255,255,255,.06);
-
-}
-
-.logo {
-
-    font-size:25px;
-
-    font-weight:900;
-
-    white-space:nowrap;
-
-}
-
-.logo span {
-
-    color:var(--accent);
-
-}
-
-nav {
-
-    display:flex;
-
-    gap:22px;
-
-    flex:1;
-
-}
-
-nav a {
-
-    color:#ccc;
-
-    text-decoration:none;
-
-    font-size:14px;
-
-    cursor:pointer;
-
-}
-
-nav a:hover {
-
-    color:white;
-
-}
-
-.search {
-
-    width:220px;
-
-    background:#151720;
-
-    border:1px solid #252835;
-
-    border-radius:30px;
-
-    padding:11px 16px;
-
-    color:white;
-
-    outline:none;
-
-}
-
-.search:focus {
-
-    border-color:var(--accent);
-
-}
-
-
-/* =====================================================
-   HERO
-===================================================== */
-
-.hero {
-
-    min-height:500px;
-
-    display:flex;
-
-    align-items:flex-end;
-
-    padding:70px 6%;
-
-    background:
-
-        linear-gradient(
-            90deg,
-            #08090d 0%,
-            rgba(8,9,13,.86) 35%,
-            rgba(8,9,13,.15) 100%
-        ),
-
-        linear-gradient(
-            0deg,
-            #08090d 0%,
-            transparent 55%
-        ),
-
-        radial-gradient(
-            circle at 70% 40%,
-            #242734,
-            #08090d 60%
-        );
-
-}
-
-.hero-content {
-
-    max-width:700px;
-
-}
-
-.badge {
-
-    display:inline-block;
-
-    background:var(--accent);
-
-    padding:7px 12px;
-
-    border-radius:5px;
-
-    font-size:12px;
-
-    font-weight:bold;
-
-    margin-bottom:15px;
-
-}
-
-.hero h1 {
-
-    font-size:clamp(
-        40px,
-        6vw,
-        70px
-    );
-
-    line-height:.95;
-
-    margin:0 0 18px;
-
-}
-
-.hero p {
-
-    color:#d0d0d5;
-
-    line-height:1.6;
-
-    max-width:600px;
-
-}
-
-.watch {
-
-    display:inline-flex;
-
-    align-items:center;
-
-    gap:9px;
-
-    background:var(--accent);
-
-    color:white;
-
-    padding:14px 22px;
-
-    border-radius:7px;
-
-    text-decoration:none;
-
-    font-weight:bold;
-
-}
-
-.watch:hover {
-
-    background:var(--accent-hover);
-
-}
-
-
-/* =====================================================
-   MAIN
-===================================================== */
-
-main {
-
-    width:90%;
-
-    max-width:1300px;
-
-    margin:auto;
-
-    padding:45px 0 80px;
-
-}
-
-.section-title {
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    margin-bottom:20px;
-
-}
-
-.section-title h2 {
-
-    margin:0;
-
-    font-size:25px;
-
-}
-
-.section-title span {
-
-    color:var(--muted);
-
-    font-size:13px;
-
-}
-
-
-/* =====================================================
-   PLAYER
-===================================================== */
-
-.player-container {
-
-    background:#000;
-
-    border-radius:12px;
-
-    overflow:hidden;
-
-    box-shadow:
-        0 20px 60px rgba(0,0,0,.45);
-
-    border:1px solid #1e2029;
-
-}
-
-.player {
-
-    width:100%;
-
-    aspect-ratio:16/9;
-
-}
-
-iframe {
-
-    width:100%;
-
-    height:100%;
-
-    border:0;
-
-    display:block;
-
-}
-
-
-/* =====================================================
-   INFO
-===================================================== */
-
-.movie-info {
-
-    margin-top:25px;
-
-    background:var(--card);
-
-    border:1px solid #1e2029;
-
-    border-radius:12px;
-
-    padding:25px;
-
-}
-
-.movie-info h2 {
-
-    margin-top:0;
-
-}
-
-.movie-info p {
-
-    color:var(--muted);
-
-    line-height:1.7;
-
-}
-
-.tags {
-
-    display:flex;
-
-    gap:8px;
-
-    flex-wrap:wrap;
-
-}
-
-.tag {
-
-    background:var(--card2);
-
-    border:1px solid #272a35;
-
-    padding:7px 11px;
-
-    border-radius:20px;
-
-    font-size:12px;
-
-    color:#bbb;
-
-}
-
-
-/* =====================================================
-   CARDS
-===================================================== */
-
-.movies {
-
-    display:grid;
-
-    grid-template-columns:
-        repeat(
-            auto-fill,
-            minmax(170px,1fr)
-        );
-
-    gap:18px;
-
-}
-
-.movie {
-
-    background:var(--card);
-
-    border-radius:9px;
-
-    overflow:hidden;
-
-    transition:.25s;
-
-    cursor:pointer;
-
-    border:1px solid transparent;
-
-}
-
-.movie:hover {
-
-    transform:translateY(-6px);
-
-    border-color:#30333f;
-
-}
-
-.poster-wrap {
-
-    position:relative;
-
-}
-
-.movie img {
-
-    width:100%;
-
-    aspect-ratio:2/3;
-
-    object-fit:cover;
-
-    display:block;
-
-}
-
-.type-badge,
-.available,
-.unavailable {
-
-    position:absolute;
-
-    top:8px;
-
-    padding:5px 7px;
-
-    border-radius:4px;
-
-    font-size:10px;
-
-    font-weight:bold;
-
-}
-
-.type-badge {
-
-    left:8px;
-
-    background:rgba(0,0,0,.75);
-
-}
-
-.available {
-
-    right:8px;
-
-    background:#16803c;
-
-}
-
-.unavailable {
-
-    right:8px;
-
-    background:#555;
-
-}
-
-.movie-info-small {
-
-    padding:12px;
-
-}
-
-.movie-info-small h3 {
-
-    margin:0 0 7px;
-
-    font-size:14px;
-
-    line-height:1.35;
-
-}
-
-.movie-info-small span {
-
-    color:#999;
-
-    font-size:12px;
-
-}
-
-.loading {
-
-    grid-column:1/-1;
-
-    text-align:center;
-
-    padding:50px;
-
-    color:#999;
-
-}
-
-
-/* =====================================================
-   EPISODIOS
-===================================================== */
-
-.episodes-grid {
-
-    display:grid;
-
-    grid-template-columns:
-        repeat(
-            auto-fill,
-            minmax(180px,1fr)
-        );
-
-    gap:10px;
-
-}
-
-.episode {
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    gap:10px;
-
-    padding:14px;
-
-    border-radius:7px;
-
-    text-align:left;
-
-    cursor:pointer;
-
-    color:white;
-
-}
-
-.available-episode {
-
-    background:#171922;
-
-    border:1px solid #292c38;
-
-}
-
-.available-episode:hover {
-
-    border-color:var(--accent);
-
-}
-
-.unavailable-episode {
-
-    background:#111;
-
-    border:1px solid #222;
-
-    color:#777;
-
-}
-
-.episode span {
-
-    font-size:11px;
-
-}
-
-
-/* =====================================================
-   FOOTER
-===================================================== */
-
-footer {
-
-    border-top:1px solid #1c1e27;
-
-    padding:35px 5%;
-
-    text-align:center;
-
-    color:#666;
-
-    font-size:13px;
-
-}
-
-
-/* =====================================================
-   MOBILE
-===================================================== */
-
-@media(max-width:700px) {
-
-    header {
-
-        min-height:60px;
-
-        padding:10px 18px;
-
-        gap:10px;
-
-        flex-wrap:wrap;
-
-    }
-
-    nav {
-
-        order:3;
-
-        width:100%;
-
-        justify-content:center;
-
-        gap:18px;
-
-    }
-
-    nav a {
-
-        font-size:12px;
-
-    }
-
-    .logo {
-
-        font-size:21px;
-
-    }
-
-    .search {
-
-        margin-left:auto;
-
-        width:145px;
-
-        padding:9px 13px;
-
-    }
-
-    .hero {
-
-        min-height:470px;
-
-        padding:35px 20px;
-
-    }
-
-    .hero h1 {
-
-        font-size:40px;
-
-    }
-
-    main {
-
-        width:94%;
-
-        padding-top:30px;
-
-    }
-
-    .movies {
-
-        grid-template-columns:
-            repeat(2,1fr);
-
-        gap:12px;
-
-    }
-
-    .movie-info {
-
-        padding:18px;
-
-    }
-
-    .episodes-grid {
-
-        grid-template-columns:1fr;
-
-    }
-
-}
-
-</style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieZone</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-
-
 <body>
 
-
 <header>
-
-    <div class="logo">
+    <div class="logo" onclick="mostrarVista('home')">
         MOVIE<span>ZONE</span>
     </div>
 
-
     <nav>
-
-        <a
-            href="#inicio"
-            data-seccion="peliculas"
-        >
-            Inicio
-        </a>
-
-        <a
-            href="#peliculas"
-            data-seccion="peliculas"
-        >
-            Películas
-        </a>
-
-        <a
-            href="#series"
-            data-seccion="series"
-        >
-            Series
-        </a>
-
-        <a
-            href="#anime"
-            data-seccion="anime"
-        >
-            Anime
-        </a>
-
+        <a href="#" data-vista="home" class="active">Inicio</a>
+        <a href="#" data-vista="peliculas">Películas</a>
+        <a href="#" data-vista="series">Series</a>
+        <a href="#" data-vista="anime">Anime</a>
     </nav>
 
-
-    <input
-        id="search"
-        class="search"
-        type="search"
-        placeholder="Buscar..."
-        autocomplete="off"
-    >
-
+    <input id="search" class="search" type="search" placeholder="Buscar..." autocomplete="off">
 </header>
 
+<!-- ==================== HOME ==================== -->
+<div id="view-home" class="view active">
+    <section class="hero">
+        <div class="hero-content">
+            <div class="badge">MOVIEZONE</div>
+            <h1>Descubre tu próximo contenido</h1>
+            <p>Películas, series y anime. Explora el catálogo y selecciona lo que quieras reproducir.</p>
+            <button class="watch" onclick="mostrarVista('peliculas')">▶ Explorar catálogo</button>
+        </div>
+    </section>
 
-<!-- ==================================================
-     HERO
-=================================================== -->
+    <!-- Slider de películas nuevas (2026) -->
+    <div style="padding: 0 5% 10px;">
+        <div class="section-title" style="margin-top: 30px;">
+            <h2>Novedades 2026</h2>
+            <span>Solo este año</span>
+        </div>
+        <div class="nuevas-slider">
+            <div class="nuevas-track" id="nuevas-track">
+                <!-- Se llena con JS -->
+            </div>
+        </div>
+    </div>
 
-<section
-    class="hero"
-    id="inicio"
->
+    <main>
+        <section>
+            <div class="section-title">
+                <h2>Recomendaciones</h2>
+                <span id="home-info">Cargando...</span>
+            </div>
+            <div class="movies" id="home-container">
+                <div class="loading">Cargando recomendaciones...</div>
+            </div>
+        </section>
+    </main>
+</div>
 
-    <div class="hero-content">
+<!-- ==================== PELÍCULAS ==================== -->
+<div id="view-peliculas" class="view">
+    <main>
+        <div class="section-title">
+            <h2>Películas</h2>
+            <span id="peliculas-info">Cargando...</span>
+        </div>
+        <div class="movies" id="peliculas-container">
+            <div class="loading">Cargando películas...</div>
+        </div>
+    </main>
+</div>
 
-        <div class="badge">
-            MOVIEZONE
+<!-- ==================== SERIES ==================== -->
+<div id="view-series" class="view">
+    <main>
+        <div class="section-title">
+            <h2>Series</h2>
+            <span id="series-info">Cargando...</span>
+        </div>
+        <div class="movies" id="series-container">
+            <div class="loading">Cargando series...</div>
+        </div>
+    </main>
+</div>
+
+<!-- ==================== ANIME ==================== -->
+<div id="view-anime" class="view">
+    <main>
+        <div class="section-title">
+            <h2>Anime</h2>
+            <span id="anime-info">Cargando...</span>
+        </div>
+        <div class="movies" id="anime-container">
+            <div class="loading">Cargando anime...</div>
+        </div>
+    </main>
+</div>
+
+<!-- ==================== BÚSQUEDA ==================== -->
+<div id="view-search" class="view">
+    <main>
+        <div class="section-title">
+            <h2>Resultados de búsqueda</h2>
+            <span id="search-info">Buscando...</span>
+        </div>
+        <div class="movies" id="search-container">
+            <div class="loading">Buscando...</div>
+        </div>
+    </main>
+</div>
+
+<!-- ==================== DETALLE ==================== -->
+<div id="view-detail" class="view">
+    <main>
+        <button class="back-btn" onclick="volverAtras()">← Volver</button>
+
+        <div class="detail-header">
+            <div class="detail-poster">
+                <img id="detail-poster" src="" alt="Portada">
+            </div>
+            <div class="detail-info">
+                <h1 id="detail-title">Título</h1>
+                <div class="tags" id="detail-tags"></div>
+                <p id="detail-description">Descripción...</p>
+            </div>
         </div>
 
-
-        <h1 id="hero-title">
-            Descubre tu próximo contenido
-        </h1>
-
-
-        <p id="hero-description">
-            Películas, series y anime.
-            Explora el catálogo y selecciona
-            lo que quieras reproducir.
-        </p>
-
-
-        <a
-            href="#peliculas"
-            class="watch"
-        >
-            ▶ Explorar catálogo
-        </a>
-
-    </div>
-
-</section>
-
-
-<main>
-
-
-<!-- ==================================================
-     REPRODUCTOR
-=================================================== -->
-
-<section id="reproductor">
-
-    <div class="section-title">
-
-        <h2 id="player-title">
-            Reproductor
-        </h2>
-
-        <span>
-            Selecciona un contenido
-        </span>
-
-    </div>
-
-
-    <div class="player-container">
-
-        <div class="player">
-
-            <iframe
-                id="player"
-                src="about:blank"
-                title="Reproductor"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowfullscreen
-            ></iframe>
-
+        <div class="player-container">
+            <div class="player">
+                <iframe id="detail-player" src="about:blank" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+            </div>
         </div>
 
-    </div>
-
-</section>
-
-
-<!-- ==================================================
-     INFORMACIÓN
-=================================================== -->
-
-<section class="movie-info">
-
-    <h2 id="info-title">
-        Selecciona un contenido
-    </h2>
-
-
-    <p id="info-description">
-        Aquí aparecerá la información
-        del contenido seleccionado.
-    </p>
-
-
-    <div
-        class="tags"
-        id="info-tags"
-    ></div>
-
-</section>
-
-
-<!-- ==================================================
-     CATÁLOGO
-=================================================== -->
-
-<section
-    id="peliculas"
-    style="margin-top:50px;"
->
-
-    <div class="section-title">
-
-        <h2>
-            Recomendaciones
-        </h2>
-
-        <span id="resultado-info">
-            Cargando...
-        </span>
-
-    </div>
-
-
-    <div
-        class="movies"
-        id="movies-container"
-    >
-
-        <div class="loading">
-            Cargando recomendaciones...
+        <div id="episodes-section" style="display:none;">
+            <div class="section-title">
+                <h2>Episodios</h2>
+            </div>
+            <div class="episodes-grid" id="episodes-container"></div>
         </div>
-
-    </div>
-
-</section>
-
-
-</main>
-
+    </main>
+</div>
 
 <footer>
-
-    © 2026 MovieZone ·
-    Plataforma de reproducción
-
+    © 2026 MovieZone · Plataforma de reproducción
 </footer>
 
-
 <script src="app.js"></script>
-
 </body>
-
 </html>
