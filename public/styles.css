@@ -540,3 +540,65 @@ footer {
         width: 160px;
     }
 }
+
+
+/* ========== PAGINACIÓN ========== */
+.paginacion {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+.paginacion button {
+    background: var(--card2);
+    border: 1px solid #2a2d3a;
+    color: #ddd;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.paginacion button:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: white;
+}
+
+.paginacion button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.paginacion button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ========== BOTÓN FAVORITO ========== */
+.fav-btn {
+    background: transparent;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 12px;
+    margin-bottom: 20px;
+    transition: 0.2s;
+}
+
+.fav-btn:hover {
+    border-color: var(--accent);
+    color: white;
+}
+
+.fav-btn.activo {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
