@@ -20,6 +20,73 @@ const contenedores = {
     search: document.getElementById("search-container")
 };
 
+// ======================================================
+// PAGINACIÓN Y FAVORITOS
+// ======================================================
+let paginaActual = {
+    peliculas: 1,
+    series: 1,
+    anime: 1
+};
+
+const LIMIT = 24;
+
+// Favoritos (localStorage)
+function obtenerFavoritos() {
+    try {
+        return JSON.parse(localStorage.getItem("moviezone_favoritos") || "[]");
+    } catch {
+        return [];
+    }
+}
+
+function guardarFavoritos(lista) {
+    localStorage.setItem("moviezone_favoritos", JSON.stringify(lista));
+}
+
+function esFavorito(link) {
+    return obtenerFavoritos().some(f => f.link === link);
+}
+
+function toggleFavorito() {
+    if (!seleccionActual) return;
+
+    let favoritos = obtenerFavoritos();
+    const existe = favoritos.findIndex(f => f.link === seleccionActual.link);
+
+    if (existe >= 0) {
+        favoritos.splice(existe, 1);
+    } else {
+        favoritos.unshift({
+            link: seleccionActual.link,
+            nombre: seleccionActual.nombre,
+            portada: seleccionActual.portada,
+            tipo: seleccionActual.tipo,
+            year: seleccionActual.year,
+            reproductor: seleccionActual.reproductor,
+            embeds: seleccionActual.embeds || [],
+            episodios: seleccionActual.episodios || [],
+            descripcion: seleccionActual.descripcion
+        });
+    }
+
+    guardarFavoritos(favoritos);
+    actualizarBotonFavorito();
+}
+
+function actualizarBotonFavorito() {
+    const btn = document.getElementById("btn-favorito");
+    if (!btn || !seleccionActual) return;
+
+    if (esFavorito(seleccionActual.link)) {
+        btn.textContent = "★ Quitar de favoritos";
+        btn.classList.add("activo");
+    } else {
+        btn.textContent = "☆ Agregar a favoritos";
+        btn.classList.remove("activo");
+    }
+}
+
 const infos = {
     home: document.getElementById("home-info"),
     peliculas: document.getElementById("peliculas-info"),
@@ -65,22 +132,25 @@ function volverAtras() {
 // ======================================================
 // CARGAR SECCIÓN
 // ======================================================
-async function cargarSeccion(seccion) {
+async function cargarSeccion(seccion, pagina = 1) {
     if (cargando) return;
     cargando = true;
 
     seccionActual = seccion;
+    paginaActual[seccion] = pagina;
 
     const contenedor = contenedores[seccion] || contenedores.peliculas;
     const info = infos[seccion] || infos.peliculas;
+    const paginacionEl = document.getElementById(`${seccion}-paginacion`);
 
     contenedor.innerHTML = `<div class="loading">Cargando ${textoSeccion(seccion)}...</div>`;
     if (info) info.textContent = "Cargando...";
+    if (paginacionEl) paginacionEl.innerHTML = "";
 
     try {
-        let url = "/api/catalogo";
-        if (seccion === "series") url = "/api/series";
-        if (seccion === "anime") url = "/api/animes";
+        let url = `/api/catalogo?page=${pagina}&limit=${LIMIT}`;
+        if (seccion === "series") url = `/api/series?page=${pagina}&limit=${LIMIT}`;
+        if (seccion === "anime") url = `/api/animes?page=${pagina}&limit=${LIMIT}`;
 
         const respuesta = await fetch(url, { cache: "no-store" });
         if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
@@ -91,13 +161,17 @@ async function cargarSeccion(seccion) {
         mostrarCatalogo(lista, contenedor);
 
         if (info) {
-            info.textContent = `${lista.length} disponibles`;
+            info.textContent = `Página ${pagina} · ${lista.length} resultados`;
         }
 
-        // Si es home, también llenamos el slider de 2026
+        // Dibujar botones de paginación
+        if (paginacionEl) {
+            dibujarPaginacion(paginacionEl, seccion, pagina, lista.length);
+        }
+
+        // Si es home, también llenamos el slider
         if (seccion === "peliculas" || seccion === "home") {
             llenarSliderNuevas(lista);
-            // También llenamos el contenedor de home
             if (seccion === "peliculas") {
                 mostrarCatalogo(lista, contenedores.home);
                 if (infos.home) infos.home.textContent = `${lista.length} disponibles`;
@@ -115,6 +189,29 @@ async function cargarSeccion(seccion) {
     } finally {
         cargando = false;
     }
+}
+
+function dibujarPaginacion(contenedor, seccion, paginaActualNum, cantidadActual) {
+    contenedor.innerHTML = "";
+
+    const btnAnterior = document.createElement("button");
+    btnAnterior.textContent = "← Anterior";
+    btnAnterior.disabled = paginaActualNum <= 1;
+    btnAnterior.onclick = () => cargarSeccion(seccion, paginaActualNum - 1);
+    contenedor.appendChild(btnAnterior);
+
+    const btnActual = document.createElement("button");
+    btnActual.textContent = `Página ${paginaActualNum}`;
+    btnActual.classList.add("active");
+    btnActual.disabled = true;
+    contenedor.appendChild(btnActual);
+
+    const btnSiguiente = document.createElement("button");
+    btnSiguiente.textContent = "Siguiente →";
+    // Si trajo menos del límite, probablemente no hay más páginas
+    btnSiguiente.disabled = cantidadActual < LIMIT;
+    btnSiguiente.onclick = () => cargarSeccion(seccion, paginaActualNum + 1);
+    contenedor.appendChild(btnSiguiente);
 }
 
 function textoSeccion(seccion) {
@@ -332,8 +429,25 @@ function seleccionar(item) {
         // Solo para películas mostramos servidores y descargas de inmediato
         renderServidoresYDescargas(item.embeds, item.downloads, item.reproductor);
     }
-
+    
+    actualizarBotonFavorito();
     mostrarVista("detail");
+}
+
+////FAVORITOS//////
+function cargarFavoritos() {
+    const favoritos = obtenerFavoritos();
+    const contenedor = document.getElementById("favoritos-container");
+    const info = document.getElementById("favoritos-info");
+
+    if (info) info.textContent = `${favoritos.length} guardados`;
+
+    if (favoritos.length === 0) {
+        contenedor.innerHTML = `<div class="loading">No tienes favoritos todavía.<br>Marca alguna película o serie con la estrella ★</div>`;
+        return;
+    }
+
+    mostrarCatalogo(favoritos, contenedor);
 }
 
 
@@ -523,16 +637,19 @@ document.querySelectorAll("nav a").forEach(enlace => {
 
         if (vista === "home") {
             mostrarVista("home");
-            cargarSeccion("peliculas"); // home usa películas + slider
+            cargarSeccion("peliculas");
         } else if (vista === "peliculas") {
             mostrarVista("peliculas");
-            cargarSeccion("peliculas");
+            cargarSeccion("peliculas", paginaActual.peliculas || 1);
         } else if (vista === "series") {
             mostrarVista("series");
-            cargarSeccion("series");
+            cargarSeccion("series", paginaActual.series || 1);
         } else if (vista === "anime") {
             mostrarVista("anime");
-            cargarSeccion("anime");
+            cargarSeccion("anime", paginaActual.anime || 1);
+        } else if (vista === "favoritos") {
+            mostrarVista("favoritos");
+            cargarFavoritos();
         }
     });
 });
