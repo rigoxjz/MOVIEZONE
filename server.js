@@ -38,6 +38,12 @@ const YEARS = {
     1354: "2024", 2792: "2020", 1816: "2019", 1926: "2018", 1874: "2017"
 };
 
+const COUNTRIES = {
+    457: "Estados Unidos", 774: "Reino Unido", 787: "Canadá", 617: "Francia",
+    5436: "México", 2499: "España", 733: "Japón", 4601: "Corea del Sur",
+    1431: "Alemania", 7746: "Argentina"
+};
+
 const HEADERS = {
     "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36",
@@ -251,6 +257,7 @@ function resolveIds(ids, mapping) {
     return ids.map(i => mapping[parseInt(i)] || String(i)).filter(Boolean);
 }
 
+
 function formatItem(p) {
     const images = p.images || {};
     let poster = images.poster || "";
@@ -291,11 +298,20 @@ function formatItem(p) {
         idiomas: resolveIds(p.lang, LANGS),
         calidad: resolveIds(p.quality, QUALITIES),
         calificacion: p.rating || p.imdb_rating || null,
+        calificacion_comunidad: p.community_rating || null,
+        votos: p.vote_count || p.community_vote_count || null,
+        fecha_estreno: p.release_date || null,
+        duracion: p.runtime || null,
+        certificacion: p.certification || null,
+        paises: resolveIds(p.countries, COUNTRIES),
+        ultimo_episodio: p.latest_episode || null,
         link,
         reproductor: null,
         downloads: [],
+        embeds: [],
         soloTrailer: false,
         episodios: [],
+        temporadas: [],
         postId: p._id
     };
 }
@@ -371,7 +387,7 @@ async function getEpisodes(serieId, season = 1) {
 async function enriquecerItem(item) {
     if (!item.postId) return item;
 
-    // Obtener reproductor y descargas
+    // Obtener reproductor y descargas del título principal
     const playerData = await getPlayer(item.postId);
     item.reproductor = playerData.reproductor;
     item.downloads = playerData.downloads || [];
@@ -384,27 +400,39 @@ async function enriquecerItem(item) {
         }
     }
 
-    // Si es serie o anime → cargar episodios de la temporada 1
-    if (item.tipo === "Serie" || item.tipo === "Anime") {
+    // Si es serie o anime → cargar temporadas y episodios
+if (item.tipo === "Serie" || item.tipo === "Anime") {
         const epData = await getEpisodes(item.postId, 1);
-        const posts = epData.posts || [];
+        let seasons = epData.seasons || [];
+        if (!seasons.length) seasons = [1];
+        seasons = [...new Set(seasons.map(s => parseInt(s)))].sort((a, b) => a - b);
 
+        item.temporadas = seasons;
         item.episodios = [];
+
+        // Cargamos la primera temporada por defecto
+        const posts = epData.posts || [];
 
         for (const ep of posts) {
             const epPlayer = await getPlayer(ep._id);
             item.episodios.push({
-                nombre: ep.title || `T${ep.season_number}E${ep.episode_number}`,
-                link: null,
+                id: ep._id,
+                nombre: ep.title || `T${ep.season_number}E${String(ep.episode_number).padStart(2, "0")}`,
+                season: ep.season_number,
+                episode: ep.episode_number,
                 video: epPlayer.reproductor || null,
+                embeds: epPlayer.embeds || [],
                 downloads: epPlayer.downloads || [],
-                soloTrailer: epPlayer.reproductor ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be")) : false
+                soloTrailer: epPlayer.reproductor
+                    ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be"))
+                    : false
             });
         }
     }
 
     return item;
 }
+
 
 function esYouTube(url) {
     if (!url) return false;
@@ -1505,6 +1533,53 @@ app.get(
         }
     }
 );
+
+// ======================================================
+// EPISODIOS POR TEMPORADA
+// ======================================================
+app.get("/api/episodios", async (req, res) => {
+    try {
+        const postId = req.query.postId;
+        const season = parseInt(req.query.season) || 1;
+
+        if (!postId) {
+            return res.status(400).json({ error: "Falta postId" });
+        }
+
+        const epData = await getEpisodes(postId, season);
+        let seasons = epData.seasons || [];
+        if (!seasons.length) seasons = [1];
+        seasons = [...new Set(seasons.map(s => parseInt(s)))].sort((a, b) => a - b);
+
+        const posts = epData.posts || [];
+        const episodios = [];
+
+        for (const ep of posts) {
+            const epPlayer = await getPlayer(ep._id);
+            episodios.push({
+                id: ep._id,
+                nombre: ep.title || `T${ep.season_number}E${String(ep.episode_number).padStart(2, "0")}`,
+                season: ep.season_number,
+                episode: ep.episode_number,
+                video: epPlayer.reproductor || null,
+                embeds: epPlayer.embeds || [],
+                downloads: epPlayer.downloads || [],
+                soloTrailer: epPlayer.reproductor
+                    ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be"))
+                    : false
+            });
+        }
+
+        res.json({
+            temporadas: seasons,
+            seasonActual: season,
+            episodios
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "No se pudieron cargar los episodios", detalle: error.message });
+    }
+});
 // ======================================================
 // FRONTEND
 // ======================================================
