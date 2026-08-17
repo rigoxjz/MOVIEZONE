@@ -9,7 +9,9 @@ const vistas = {
     series: document.getElementById("view-series"),
     anime: document.getElementById("view-anime"),
     search: document.getElementById("view-search"),
-    detail: document.getElementById("view-detail")
+    detail: document.getElementById("view-detail"),
+    favoritos: document.getElementById("view-favoritos"),
+    historial: document.getElementById("view-historial")
 };
 
 const contenedores = {
@@ -85,6 +87,71 @@ function actualizarBotonFavorito() {
         btn.textContent = "☆ Agregar a favoritos";
         btn.classList.remove("activo");
     }
+}
+
+
+
+// ======================================================
+// HISTORIAL DE VISTOS
+// ======================================================
+function obtenerHistorial() {
+    try {
+        return JSON.parse(localStorage.getItem("moviezone_historial") || "[]");
+    } catch {
+        return [];
+    }
+}
+
+function guardarHistorial(lista) {
+    localStorage.setItem("moviezone_historial", JSON.stringify(lista));
+}
+
+function agregarAlHistorial(item) {
+    if (!item || !item.link) return;
+
+    let historial = obtenerHistorial();
+
+    // Quitamos si ya existe para ponerlo al principio
+    historial = historial.filter(h => h.link !== item.link);
+
+    historial.unshift({
+        link: item.link,
+        nombre: item.nombre,
+        portada: item.portada,
+        tipo: item.tipo,
+        year: item.year,
+        postId: item.postId || null,
+        vistoEn: new Date().toISOString()
+    });
+
+    // Guardamos solo los últimos 50
+    if (historial.length > 50) {
+        historial = historial.slice(0, 50);
+    }
+
+    guardarHistorial(historial);
+}
+
+function limpiarHistorial() {
+    if (confirm("¿Seguro que quieres borrar todo el historial?")) {
+        localStorage.removeItem("moviezone_historial");
+        cargarHistorial();
+    }
+}
+
+function cargarHistorial() {
+    const historial = obtenerHistorial();
+    const contenedor = document.getElementById("historial-container");
+    const info = document.getElementById("historial-info");
+
+    if (info) info.textContent = `${historial.length} vistos`;
+
+    if (historial.length === 0) {
+        contenedor.innerHTML = `<div class="loading">Todavía no has visto nada.</div>`;
+        return;
+    }
+
+    mostrarCatalogo(historial, contenedor);
 }
 
 const infos = {
@@ -666,6 +733,9 @@ document.querySelectorAll("nav a").forEach(enlace => {
         } else if (vista === "favoritos") {
             mostrarVista("favoritos");
             cargarFavoritos();
+        } else if (vista === "historial") {
+            mostrarVista("historial");
+            cargarHistorial();
         }
     });
 });
