@@ -21,6 +21,90 @@ const session = axios.create({
 });
 
 // ======================================================
+// TELEGRAM + GITHUB (solo nuevos)
+// ======================================================
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
+const GITHUB_DATA_URL = process.env.GITHUB_DATA_URL || "";
+
+// Set de links que ya existen en el JSON de GitHub
+let knownLinks = new Set();
+
+async function cargarDatosGitHub() {
+    if (!GITHUB_DATA_URL) {
+        console.log("GITHUB_DATA_URL no configurada");
+        return;
+    }
+    try {
+        const res = await session.get(GITHUB_DATA_URL, { timeout: 10000 });
+        const data = Array.isArray(res.data) ? res.data : [];
+        knownLinks = new Set(data.map(item => item.link).filter(Boolean));
+        console.log(`GitHub: ${knownLinks.size} items conocidos cargados`);
+    } catch (err) {
+        console.error("No se pudo cargar JSON de GitHub:", err.message);
+        knownLinks = new Set();
+    }
+}
+
+async function enviarTelegram(texto) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+    try {
+        await axios.post(
+            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+            {
+                chat_id: TELEGRAM_CHAT_ID,
+                text: texto,
+                parse_mode: "HTML",
+                disable_web_page_preview: true
+            },
+            { timeout: 10000 }
+        );
+    } catch (err) {
+        console.error("Error enviando a Telegram:", err.message);
+    }
+}
+
+async function enviarNuevosATelegram(items) {
+    if (!items || items.length === 0) return;
+
+    const nuevos = items.filter(item => item.link && !knownLinks.has(item.link));
+    if (nuevos.length === 0) {
+        console.log("No hay items nuevos para Telegram");
+        return;
+    }
+
+    // Actualizamos el set local para no reenviar en esta sesión
+    nuevos.forEach(item => knownLinks.add(item.link));
+
+    // Mensaje resumido
+    let mensaje = `🎬 <b>${nuevos.length} nuevo(s) detectado(s)</b>\n\n`;
+
+    for (const item of nuevos.slice(0, 15)) { // limitamos para no pasarnos del límite de Telegram
+        mensaje += `<b>${item.nombre || "Sin título"}</b>\n`;
+        mensaje += `Tipo: ${item.tipo || "?"}\n`;
+        if (item.soloTrailer) mensaje += `⚠️ Solo trailer (YouTube)\n`;
+        if (item.reproductor) mensaje += `▶ Reproductor: ${item.reproductor}\n`;
+        if (item.portada) mensaje += `🖼 Portada: ${item.portada}\n`;
+        mensaje += `Link: ${item.link}\n`;
+        mensaje += `────────────────\n`;
+    }
+
+    if (nuevos.length > 15) {
+        mensaje += `\n... y ${nuevos.length - 15} más`;
+    }
+
+    await enviarTelegram(mensaje);
+
+    // También enviamos el JSON completo de los nuevos como documento (más fácil de copiar)
+    try {
+        const jsonContent = JSON.stringify(nuevos, null, 2);
+        const FormData = require("form-data"); // si no está, usamos otra forma
+        // Como form-data puede no estar instalado, enviamos solo el mensaje de texto por ahora.
+        // Si quieres el archivo .json completo, avísame y lo agregamos con buffer.
+    } catch {}
+}
+
+// ======================================================
 // CACHE (archivos temporales en /tmp - compatible con Render)
 // ======================================================
 const CACHE_DIR = path.join("/tmp", "moviezone-cache");
@@ -244,7 +328,6 @@ function extraerPortada(pagina, link) {
             if (limpia.includes(" ")) {
                 limpia = limpia.split(/\s+/)[0];
             }
-            // Quitar posibles query de tamaño raro
             const absoluta = unirUrl(link, limpia);
             if (!absoluta) return;
             if (!candidatos.includes(absoluta)) {
@@ -304,7 +387,6 @@ function extraerPortada(pagina, link) {
         for (const imagen of posibles) {
             if (!imagen) continue;
             const texto = imagen.toLowerCase();
-            // Filtrar basura
             if (
                 texto.includes("logo") ||
                 texto.includes("avatar") ||
@@ -331,7 +413,6 @@ function extraerPortada(pagina, link) {
         }
     });
 
-    // Si no hay candidatos, devolver placeholder
     if (candidatos.length === 0) {
         return "https://via.placeholder.com/300x450/111111/ffffff?text=Sin+Portada";
     }
@@ -580,7 +661,6 @@ async function extraerReproductor(url, $pagina) {
 
         try {
 
-            // Si es directamente un recurso reproducible
             if (
                 candidato.includes(".m3u8") ||
                 candidato.includes(".mp4")
@@ -590,10 +670,6 @@ async function extraerReproductor(url, $pagina) {
 
             }
 
-
-            // ==================================================
-            // PLAY.PHP
-            // ==================================================
 
             if (
                 candidato.includes("play.php")
@@ -605,7 +681,6 @@ async function extraerReproductor(url, $pagina) {
                     );
 
 
-                // window.location.href
                 const match =
                     htmlPlayer.match(
                         /window\.location\.href\s*=\s*["']([^"']+)/i
@@ -627,7 +702,6 @@ async function extraerReproductor(url, $pagina) {
                 }
 
 
-                // location.href
                 const match2 =
                     htmlPlayer.match(
                         /location\.href\s*=\s*["']([^"']+)/i
@@ -649,7 +723,6 @@ async function extraerReproductor(url, $pagina) {
                 }
 
 
-                // URL dentro del HTML
                 const urlsPlayer =
                     htmlPlayer.match(regex) || [];
 
@@ -697,10 +770,6 @@ async function extraerReproductor(url, $pagina) {
 
             }
 
-
-            // ==================================================
-            // PLAYER / EMBED
-            // ==================================================
 
             if (
                 candidato.includes("/embed/") ||
@@ -812,12 +881,9 @@ async function procesarPagina(link) {
             pagina
         );
 
-    // Detectar si solo es trailer de YouTube
     let soloTrailer = false;
     if (esYouTube(reproductor)) {
         soloTrailer = true;
-        // Se deja el enlace de YouTube para que se pueda ver el trailer
-        // pero se marca claramente
     }
 
     const episodios =
@@ -827,7 +893,6 @@ async function procesarPagina(link) {
         );
     let year = null;
     let genero = null;
-    // JSON-LD adicional
     pagina(
         'script[type="application/ld+json"]'
     ).each((_, script) => {
@@ -891,7 +956,6 @@ async function procesarPagina(link) {
         } catch {}
     });
 
-    // Si es solo trailer, ajustar el nombre para que se note
     let nombreFinal = nombre;
     if (soloTrailer && nombreFinal) {
         nombreFinal = `${nombreFinal} (Solo trailer - No disponible)`;
@@ -1066,7 +1130,6 @@ async function buscar(
             ) {
                 return;
             }
-            // Evitar páginas principales
             if (
                 href ===
                     limpiarUrl(
@@ -1086,7 +1149,6 @@ async function buscar(
             ) {
                 return;
             }
-            // Evitar paginación
             if (
                 /\/page\/\d+\/?$/.test(
                     href
@@ -1094,7 +1156,6 @@ async function buscar(
             ) {
                 return;
             }
-            // Mantener la sección solicitada
             if (
                 !termino &&
                 seccion === "peliculas" &&
@@ -1122,9 +1183,6 @@ async function buscar(
     const lista =
         Array.from(links).sort();
     const resultados = [];
-    /*
-     * Límite para no saturar Render.
-     */
     const limite =
         Math.min(
             lista.length,
@@ -1164,11 +1222,28 @@ async function buscar(
         }
     }
 
-    // Guardar en cache
+    // Guardar en cache temporal
     await setCache(cacheKey, resultados);
+
+    // Enviar solo los nuevos a Telegram
+    await enviarNuevosATelegram(resultados);
 
     return resultados;
 }
+
+// ======================================================
+// MANEJO DE ERRORES → Telegram
+// ======================================================
+process.on("uncaughtException", async (err) => {
+    console.error("uncaughtException:", err);
+    await enviarTelegram(`🚨 <b>Error crítico (uncaughtException)</b>\n\n${err.message}\n\n${err.stack?.slice(0, 800) || ""}`);
+});
+
+process.on("unhandledRejection", async (reason) => {
+    console.error("unhandledRejection:", reason);
+    await enviarTelegram(`🚨 <b>Error no manejado (unhandledRejection)</b>\n\n${String(reason).slice(0, 1000)}`);
+});
+
 // ======================================================
 // API BÚSQUEDA
 // ======================================================
@@ -1197,6 +1272,7 @@ app.get(
             });
         } catch (error) {
             console.error(error);
+            await enviarTelegram(`⚠️ Error en /api/buscar\n${error.message}`);
             res
                 .status(500)
                 .json({
@@ -1225,6 +1301,7 @@ app.get(
             });
         } catch (error) {
             console.error(error);
+            await enviarTelegram(`⚠️ Error en /api/catalogo\n${error.message}`);
             res
                 .status(500)
                 .json({
@@ -1253,6 +1330,7 @@ app.get(
             });
         } catch (error) {
             console.error(error);
+            await enviarTelegram(`⚠️ Error en /api/series\n${error.message}`);
             res
                 .status(500)
                 .json({
@@ -1281,6 +1359,7 @@ app.get(
             });
         } catch (error) {
             console.error(error);
+            await enviarTelegram(`⚠️ Error en /api/animes\n${error.message}`);
             res
                 .status(500)
                 .json({
@@ -1362,12 +1441,18 @@ app.get(
 // ======================================================
 app.listen(
     PORT,
-    () => {
+    async () => {
         console.log(
             `MovieZone ejecutándose en puerto ${PORT}`
         );
         console.log(
             `Fuente: ${BASE}`
         );
+
+        // Cargar lo que ya está guardado en GitHub
+        await cargarDatosGitHub();
+
+        // Aviso de inicio
+        await enviarTelegram(`✅ <b>MovieZone iniciado</b>\nPuerto: ${PORT}\nItems conocidos: ${knownLinks.size}`);
     }
 );
