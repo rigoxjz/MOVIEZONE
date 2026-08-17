@@ -336,6 +336,130 @@ function seleccionar(item) {
     mostrarVista("detail");
 }
 
+
+// ========== RENDER EPISODIOS ==========
+function renderEpisodios(item) {
+    const episodesContainer = document.getElementById("episodes-container");
+    const player = document.getElementById("detail-player");
+    episodesContainer.innerHTML = "";
+
+    if (!item.episodios || item.episodios.length === 0) {
+        episodesContainer.innerHTML = `<div class="loading">No hay episodios en esta temporada</div>`;
+        return;
+    }
+
+    item.episodios.forEach((episodio, index) => {
+        const boton = document.createElement("button");
+        const nombre = episodio.nombre || `Episodio ${index + 1}`;
+        const tieneVideo = Boolean(episodio.video) || (Array.isArray(episodio.embeds) && episodio.embeds.length > 0);
+
+        boton.className = tieneVideo ? "episode" : "episode unavailable";
+        boton.innerHTML = `
+            <strong>${escapeHtml(nombre)}</strong>
+            <span>${tieneVideo ? "Disponible" : "Sin reproductor"}</span>
+        `;
+
+        boton.addEventListener("click", () => {
+            if (!tieneVideo) return;
+
+            document.getElementById("detail-title").textContent = `${item.nombre} - ${nombre}`;
+
+            // Al seleccionar episodio → mostrar todos sus servidores
+            renderServidoresYDescargas(
+                episodio.embeds || [],
+                episodio.downloads || [],
+                episodio.video
+            );
+        });
+
+        episodesContainer.appendChild(boton);
+    });
+}
+
+// ========== RENDER SERVIDORES + DESCARGAS ==========
+function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl) {
+    const serversSection = document.getElementById("servers-section");
+    const serversContainer = document.getElementById("servers-container");
+    const downloadsSection = document.getElementById("downloads-section");
+    const downloadsContainer = document.getElementById("downloads-container");
+    const player = document.getElementById("detail-player");
+
+    serversContainer.innerHTML = "";
+    downloadsContainer.innerHTML = "";
+    player.src = "about:blank";
+
+    let embeds = [];
+    if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
+        embeds = embedsRaw.filter(e => e && e.url);
+    } else if (fallbackUrl) {
+        embeds = [{ url: fallbackUrl, server: "Servidor 1" }];
+    }
+
+    if (embeds.length > 0) {
+        serversSection.style.display = "block";
+
+        embeds.forEach((embed, index) => {
+            const btn = document.createElement("button");
+            btn.className = "server-btn" + (index === 0 ? " active" : "");
+
+            // Label completo: [server] lang | quality
+            const parts = [];
+            if (embed.server) parts.push(`[${embed.server}]`);
+            if (embed.lang) parts.push(embed.lang);
+            if (embed.quality) parts.push(embed.quality);
+            const label = parts.length ? parts.join(" | ") : (embed.name || `Servidor ${index + 1}`);
+
+            btn.textContent = label;
+
+            btn.addEventListener("click", () => {
+                serversContainer.querySelectorAll(".server-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                player.src = embed.url;
+            });
+
+            serversContainer.appendChild(btn);
+        });
+
+// Activamos el primero automáticamente
+        player.src = embeds[0].url;
+    } else {
+        serversSection.style.display = "none";
+        // Solo mensaje, sin botón "Pídelo ya"
+        serversContainer.innerHTML = `<div style="color:#999;padding:12px 0;">Este contenido todavía no está disponible</div>`;
+        serversSection.style.display = "block";
+    }
+
+    // Descargas
+    const downloads = Array.isArray(downloadsRaw) ? downloadsRaw : [];
+    if (downloads.length > 0) {
+        downloadsSection.style.display = "block";
+
+        downloads.forEach((dl, index) => {
+            const url = dl.url || dl.link || (typeof dl === "string" ? dl : null);
+            if (!url || typeof url !== "string") return;
+
+            const a = document.createElement("a");
+            a.className = "download-btn";
+            a.href = url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+
+            // Label completo: [server] lang | quality (size)
+            const parts = [];
+            if (dl.server) parts.push(`[${dl.server}]`);
+            if (dl.lang) parts.push(dl.lang);
+            if (dl.quality) parts.push(dl.quality);
+            let label = parts.length ? parts.join(" | ") : (dl.name || `Descarga ${index + 1}`);
+            if (dl.size) label += ` (${dl.size})`;
+
+            a.innerHTML = `⬇ ${escapeHtml(label)}`;
+            downloadsContainer.appendChild(a);
+        });
+    } else {
+        downloadsSection.style.display = "none";
+    }
+}
+
 // ======================================================
 // TAGS
 // ======================================================
