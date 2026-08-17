@@ -73,51 +73,42 @@ async function enviarNuevosATelegram(items) {
         return;
     }
 
-    // Actualizamos el set local para no reenviar en esta sesión
+    // Actualizamos el set local
     nuevos.forEach(item => knownLinks.add(item.link));
 
-    // Creamos un JSON limpio y listo para pegar en movies_saved.json
-    const jsonLimpio = JSON.stringify(nuevos, null, 2);
+    try {
+        const FormData = require("form-data");
+        const form = new FormData();
 
-    // Telegram tiene límite de ~4096 caracteres por mensaje.
-    // Si el JSON es muy grande lo partimos en varios mensajes.
-    const MAX = 3500;
-    const partes = [];
+        const jsonContent = JSON.stringify(nuevos, null, 2);
+        const buffer = Buffer.from(jsonContent, "utf-8");
 
-    if (jsonLimpio.length <= MAX) {
-        partes.push(jsonLimpio);
-    } else {
-        // Partimos por objetos aproximadamente
-        let actual = "[\n";
-        for (let i = 0; i < nuevos.length; i++) {
-            const obj = JSON.stringify(nuevos[i], null, 2);
-            if ((actual + obj).length > MAX) {
-                actual = actual.trim().replace(/,$/, "") + "\n]";
-                partes.push(actual);
-                actual = "[\n" + obj + (i < nuevos.length - 1 ? "," : "");
-            } else {
-                actual += obj + (i < nuevos.length - 1 ? ",\n" : "");
+        const nombreArchivo = `nuevos_${Date.now()}.json`;
+
+        form.append("chat_id", TELEGRAM_CHAT_ID);
+        form.append("caption", `📄 ${nuevos.length} nuevo(s) item(s)\nDescarga este archivo y súbelo a data/movies_saved.json`);
+        form.append("document", buffer, {
+            filename: nombreArchivo,
+            contentType: "application/json"
+        });
+
+        await axios.post(
+            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`,
+            form,
+            {
+                headers: form.getHeaders(),
+                timeout: 20000
             }
-        }
-        if (actual.length > 3) {
-            actual = actual.trim().replace(/,$/, "") + "\n]";
-            partes.push(actual);
-        }
-    }
+        );
 
-    // Enviamos cada parte
-    for (let i = 0; i < partes.length; i++) {
-        const encabezado = partes.length > 1
-            ? `📄 <b>Nuevos items (parte ${i + 1}/${partes.length})</b>\nCopia y pega en movies_saved.json:\n\n`
-            : `📄 <b>${nuevos.length} nuevo(s) item(s)</b>\nCopia y pega en movies_saved.json:\n\n`;
+        console.log(`Enviado archivo JSON con ${nuevos.length} items nuevos`);
+    } catch (err) {
+        console.error("Error enviando archivo a Telegram:", err.message);
 
-        const mensaje = encabezado + "<pre>" + partes[i].replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</pre>";
-
+        // Respaldo: si falla el archivo, manda el JSON como texto
+        const jsonLimpio = JSON.stringify(nuevos, null, 2);
+        const mensaje = `📄 <b>${nuevos.length} nuevo(s) item(s)</b>\n\n<pre>${jsonLimpio.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 3800)}</pre>`;
         await enviarTelegram(mensaje);
-
-        if (i < partes.length - 1) {
-            await new Promise(r => setTimeout(r, 800));
-        }
     }
 }
 
