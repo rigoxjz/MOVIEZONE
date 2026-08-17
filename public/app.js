@@ -250,7 +250,7 @@ function seleccionar(item) {
         poster.src = "https://via.placeholder.com/300x450/11131a/ffffff?text=Sin+portada";
     };
 
-    // Tags (tipo, año, géneros)
+    // Tags
     const tags = document.getElementById("detail-tags");
     tags.innerHTML = "";
     if (item.tipo) agregarTag(item.tipo, tags);
@@ -263,10 +263,9 @@ function seleccionar(item) {
     }
     if (item.soloTrailer) agregarTag("Solo trailer", tags);
 
-    // Meta info (calificación, idiomas, calidad)
+    // Meta info
     const meta = document.getElementById("detail-meta");
     meta.innerHTML = "";
-
     if (item.calificacion) {
         meta.innerHTML += `<div class="meta-item"><strong>★</strong> ${escapeHtml(String(item.calificacion))}</div>`;
     }
@@ -276,99 +275,62 @@ function seleccionar(item) {
     if (item.calidad && item.calidad.length) {
         meta.innerHTML += `<div class="meta-item"><strong>Calidad:</strong> ${escapeHtml(item.calidad.join(", "))}</div>`;
     }
-
-    // ========== SERVIDORES / REPRODUCTORES ==========
-    const serversSection = document.getElementById("servers-section");
-    const serversContainer = document.getElementById("servers-container");
-    serversContainer.innerHTML = "";
+    if (item.paises && item.paises.length) {
+        meta.innerHTML += `<div class="meta-item"><strong>País:</strong> ${escapeHtml(item.paises.join(", "))}</div>`;
+    }
+    if (item.duracion) {
+        meta.innerHTML += `<div class="meta-item"><strong>Duración:</strong> ${escapeHtml(String(item.duracion))} min</div>`;
+    }
 
     const player = document.getElementById("detail-player");
-    let embeds = [];
-
-    if (Array.isArray(item.embeds) && item.embeds.length > 0) {
-        embeds = item.embeds.filter(e => e && e.url);
-    } else if (item.reproductor) {
-        embeds = [{ url: item.reproductor, name: "Servidor 1" }];
-    }
-
-    if (embeds.length > 0) {
-        serversSection.style.display = "block";
-
-        embeds.forEach((embed, index) => {
-            const btn = document.createElement("button");
-            btn.className = "server-btn" + (index === 0 ? " active" : "");
-            btn.textContent = embed.name || embed.server || `Servidor ${index + 1}`;
-
-            btn.addEventListener("click", () => {
-                serversContainer.querySelectorAll(".server-btn").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                player.src = embed.url;
-            });
-
-            serversContainer.appendChild(btn);
-        });
-
-        player.src = embeds[0].url;
-    } else {
-        serversSection.style.display = "none";
-        player.src = "about:blank";
-    }
-
-    // ========== DESCARGAS ==========
+    const serversSection = document.getElementById("servers-section");
+    const serversContainer = document.getElementById("servers-container");
     const downloadsSection = document.getElementById("downloads-section");
     const downloadsContainer = document.getElementById("downloads-container");
-    downloadsContainer.innerHTML = "";
-
-    const downloads = Array.isArray(item.downloads) ? item.downloads : [];
-
-    if (downloads.length > 0) {
-        downloadsSection.style.display = "block";
-
-        downloads.forEach((dl, index) => {
-            const url = dl.url || dl.link || (typeof dl === "string" ? dl : null);
-            if (!url || typeof url !== "string") return;
-
-            const a = document.createElement("a");
-            a.className = "download-btn";
-            a.href = url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.innerHTML = `⬇ ${escapeHtml(dl.name || dl.server || `Descarga ${index + 1}`)}`;
-            downloadsContainer.appendChild(a);
-        });
-    } else {
-        downloadsSection.style.display = "none";
-    }
-
-    // ========== EPISODIOS ==========
     const episodesSection = document.getElementById("episodes-section");
     const episodesContainer = document.getElementById("episodes-container");
-    episodesContainer.innerHTML = "";
+    const seasonSelect = document.getElementById("season-select");
 
-    if (Array.isArray(item.episodios) && item.episodios.length > 0) {
+    // Limpiar todo
+    serversContainer.innerHTML = "";
+    downloadsContainer.innerHTML = "";
+    episodesContainer.innerHTML = "";
+    player.src = "about:blank";
+    serversSection.style.display = "none";
+    downloadsSection.style.display = "none";
+    episodesSection.style.display = "none";
+
+    const esSerieOAnime = item.tipo === "Serie" || item.tipo === "Anime";
+
+    // ========== SERIE / ANIME ==========
+    if (esSerieOAnime && Array.isArray(item.episodios) && item.episodios.length > 0) {
         episodesSection.style.display = "block";
 
-        item.episodios.forEach((episodio, index) => {
-            const boton = document.createElement("button");
-            const nombre = episodio.nombre || `Episodio ${index + 1}`;
+        // Selector de temporadas
+        const temporadas = item.temporadas && item.temporadas.length ? item.temporadas : [1];
+        seasonSelect.innerHTML = temporadas.map(s =>
+            `<option value="${s}">Temporada ${s}</option>`
+        ).join("");
 
-            boton.className = episodio.video ? "episode" : "episode unavailable";
-            boton.innerHTML = `
-                <strong>${escapeHtml(nombre)}</strong>
-                <span>${episodio.video ? "Disponible" : "Sin reproductor"}</span>
-            `;
+        seasonSelect.onchange = async () => {
+            const season = parseInt(seasonSelect.value);
+            episodesContainer.innerHTML = `<div class="loading">Cargando temporada ${season}...</div>`;
+            try {
+                const res = await fetch(`/api/episodios?postId=${item.postId}&season=${season}`, { cache: "no-store" });
+                const data = await res.json();
+                item.episodios = data.episodios || [];
+                renderEpisodios(item);
+            } catch (err) {
+                episodesContainer.innerHTML = `<div class="loading">Error cargando episodios</div>`;
+            }
+        };
 
-            boton.addEventListener("click", () => {
-                if (!episodio.video) return;
-                player.src = episodio.video;
-                document.getElementById("detail-title").textContent =
-                    `${item.nombre} - ${nombre}`;
-            });
-
-            episodesContainer.appendChild(boton);
-        });
-    } else {
-        episodesSection.style.display = "none";
+        renderEpisodios(item);
+    }
+    // ========== PELÍCULA ==========
+    else {
+        // Solo para películas mostramos servidores y descargas de inmediato
+        renderServidoresYDescargas(item.embeds, item.downloads, item.reproductor);
     }
 
     mostrarVista("detail");
