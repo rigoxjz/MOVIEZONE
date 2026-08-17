@@ -320,14 +320,13 @@ function mostrarCatalogo(lista, contenedor) {
 // ======================================================
 // SELECCIONAR (abre la vista detalle)
 // ======================================================
-function seleccionar(item) {
+async function seleccionar(item) {
     seleccionActual = item;
     vistaAnterior = Object.keys(vistas).find(k => vistas[k].classList.contains("active")) || "home";
 
-    // Título
+    // Mostramos la vista de detalle de inmediato con lo que ya tenemos
     document.getElementById("detail-title").textContent = item.nombre || "Sin título";
 
-    // Título original
     const originalEl = document.getElementById("detail-original");
     if (item.titulo_original && item.titulo_original !== item.nombre) {
         originalEl.textContent = item.titulo_original;
@@ -336,11 +335,9 @@ function seleccionar(item) {
         originalEl.style.display = "none";
     }
 
-    // Descripción
     document.getElementById("detail-description").textContent =
         item.descripcion || "Sin descripción disponible.";
 
-    // Portada
     const poster = document.getElementById("detail-poster");
     poster.src = item.portada || "https://via.placeholder.com/300x450/11131a/ffffff?text=Sin+portada";
     poster.onerror = () => {
@@ -360,7 +357,7 @@ function seleccionar(item) {
     }
     if (item.soloTrailer) agregarTag("Solo trailer", tags);
 
-    // Meta info
+    // Meta
     const meta = document.getElementById("detail-meta");
     meta.innerHTML = "";
     if (item.calificacion) {
@@ -372,13 +369,8 @@ function seleccionar(item) {
     if (item.calidad && item.calidad.length) {
         meta.innerHTML += `<div class="meta-item"><strong>Calidad:</strong> ${escapeHtml(item.calidad.join(", "))}</div>`;
     }
-    if (item.paises && item.paises.length) {
-        meta.innerHTML += `<div class="meta-item"><strong>País:</strong> ${escapeHtml(item.paises.join(", "))}</div>`;
-    }
-    if (item.duracion) {
-        meta.innerHTML += `<div class="meta-item"><strong>Duración:</strong> ${escapeHtml(String(item.duracion))} min</div>`;
-    }
 
+    // Limpiamos player y secciones
     const player = document.getElementById("detail-player");
     const serversSection = document.getElementById("servers-section");
     const serversContainer = document.getElementById("servers-container");
@@ -386,52 +378,76 @@ function seleccionar(item) {
     const downloadsContainer = document.getElementById("downloads-container");
     const episodesSection = document.getElementById("episodes-section");
     const episodesContainer = document.getElementById("episodes-container");
-    const seasonSelect = document.getElementById("season-select");
 
-    // Limpiar todo
-    serversContainer.innerHTML = "";
-    downloadsContainer.innerHTML = "";
-    episodesContainer.innerHTML = "";
     player.src = "about:blank";
-    serversSection.style.display = "none";
+    serversContainer.innerHTML = `<div class="loading">Cargando servidores...</div>`;
+    serversSection.style.display = "block";
     downloadsSection.style.display = "none";
     episodesSection.style.display = "none";
+    downloadsContainer.innerHTML = "";
+    episodesContainer.innerHTML = "";
 
+    mostrarVista("detail");
+    actualizarBotonFavorito();
+
+    // Guardamos en historial de vistos
+    agregarAlHistorial(item);
+
+    // ========== AQUÍ ESTÁ LA CORRECCIÓN ==========
+    // Si no tiene embeds o episodios, los pedimos de nuevo al servidor
+    const necesitaEnriquecer =
+        !item.embeds || item.embeds.length === 0 ||
+        ((item.tipo === "Serie" || item.tipo === "Anime") && (!item.episodios || item.episodios.length === 0));
+
+    if (necesitaEnriquecer && (item.postId || item.link)) {
+        try {
+            const params = new URLSearchParams();
+            if (item.postId) params.set("postId", item.postId);
+            if (item.link) params.set("link", item.link);
+
+            const res = await fetch(`/api/detalle?${params.toString()}`, { cache: "no-store" });
+            if (res.ok) {
+                const completo = await res.json();
+                // Actualizamos el item actual con los datos completos
+                Object.assign(seleccionActual, completo);
+                item = seleccionActual;
+            }
+        } catch (err) {
+            console.error("Error enriqueciendo detalle:", err);
+        }
+    }
+
+    // Ahora sí renderizamos con los datos (completos o no)
     const esSerieOAnime = item.tipo === "Serie" || item.tipo === "Anime";
 
-    // ========== SERIE / ANIME ==========
     if (esSerieOAnime && Array.isArray(item.episodios) && item.episodios.length > 0) {
         episodesSection.style.display = "block";
 
-        // Selector de temporadas
-        const temporadas = item.temporadas && item.temporadas.length ? item.temporadas : [1];
-        seasonSelect.innerHTML = temporadas.map(s =>
-            `<option value="${s}">Temporada ${s}</option>`
-        ).join("");
+        const seasonSelect = document.getElementById("season-select");
+        if (seasonSelect) {
+            const temporadas = item.temporadas && item.temporadas.length ? item.temporadas : [1];
+            seasonSelect.innerHTML = temporadas.map(s =>
+                `<option value="${s}">Temporada ${s}</option>`
+            ).join("");
 
-        seasonSelect.onchange = async () => {
-            const season = parseInt(seasonSelect.value);
-            episodesContainer.innerHTML = `<div class="loading">Cargando temporada ${season}...</div>`;
-            try {
-                const res = await fetch(`/api/episodios?postId=${item.postId}&season=${season}`, { cache: "no-store" });
-                const data = await res.json();
-                item.episodios = data.episodios || [];
-                renderEpisodios(item);
-            } catch (err) {
-                episodesContainer.innerHTML = `<div class="loading">Error cargando episodios</div>`;
-            }
-        };
+            seasonSelect.onchange = async () => {
+                const season = parseInt(seasonSelect.value);
+                episodesContainer.innerHTML = `<div class="loading">Cargando temporada ${season}...</div>`;
+                try {
+                    const res = await fetch(`/api/episodios?postId=${item.postId}&season=${season}`, { cache: "no-store" });
+                    const data = await res.json();
+                    item.episodios = data.episodios || [];
+                    renderEpisodios(item);
+                } catch (err) {
+                    episodesContainer.innerHTML = `<div class="loading">Error cargando episodios</div>`;
+                }
+            };
+        }
 
         renderEpisodios(item);
-    }
-    // ========== PELÍCULA ==========
-    else {
-        // Solo para películas mostramos servidores y descargas de inmediato
+    } else {
         renderServidoresYDescargas(item.embeds, item.downloads, item.reproductor);
     }
-    
-    actualizarBotonFavorito();
-    mostrarVista("detail");
 }
 
 ////FAVORITOS//////
