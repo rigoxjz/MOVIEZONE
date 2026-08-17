@@ -7,6 +7,10 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 
+// ======================================================
+// CONFIGURACIÓN
+// ======================================================
+
 const BASE =
     process.env.SOURCE_URL ||
     "https://www.hackstore.fo";
@@ -14,6 +18,7 @@ const BASE =
 const HEADERS = {
     "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36",
+
     "Accept":
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 };
@@ -30,15 +35,26 @@ const session = axios.create({
 // ======================================================
 
 function unirUrl(base, relativa) {
+
     try {
-        return new URL(relativa, base).toString();
+
+        return new URL(
+            relativa,
+            base
+        ).toString();
+
     } catch {
+
         return null;
+
     }
 }
 
+
 function limpiarUrl(urlStr) {
+
     try {
+
         const p = new URL(urlStr);
 
         let pathname = p.pathname;
@@ -47,48 +63,85 @@ function limpiarUrl(urlStr) {
             pathname += "/";
         }
 
-        return `${p.protocol}//${p.host}${pathname}`;
+        return (
+            p.protocol +
+            "//" +
+            p.host +
+            pathname
+        );
+
     } catch {
+
         return urlStr;
+
     }
 }
 
+
 async function obtener(url) {
+
     const respuesta = await session.get(url);
+
     return cheerio.load(respuesta.data);
 }
 
 
+async function obtenerHTML(url) {
+
+    const respuesta =
+        await session.get(
+            url,
+            {
+                validateStatus:
+                    () => true
+            }
+        );
+
+    return respuesta.data || "";
+
+}
+
+
 // ======================================================
-// TIPO
+// DETECTAR TIPO
 // ======================================================
 
 function detectarTipo(url, nombre = "") {
 
     const texto =
-        `${url} ${nombre}`.toLowerCase();
+        `${url} ${nombre}`
+            .toLowerCase();
+
 
     if (
         texto.includes("/anime/") ||
         texto.includes("/animes/") ||
         texto.includes("anime")
     ) {
+
         return "Anime";
+
     }
+
 
     if (
         texto.includes("/series/") ||
         texto.includes("serie")
     ) {
+
         return "Serie";
+
     }
 
+
     return "Película";
+
 }
 
 
+
 // ======================================================
-// TÍTULO
+// TÍTULO desde aqui meti
 // ======================================================
 
 function esTituloGenerico(texto) {
@@ -119,6 +172,9 @@ function esTituloGenerico(texto) {
         palabra => t.includes(palabra)
     );
 }
+
+
+
 
 
 function extraerTitulo(pagina, link) {
@@ -245,6 +301,8 @@ function extraerTitulo(pagina, link) {
 
     return nombre;
 }
+
+
 
 
 // ======================================================
@@ -422,103 +480,496 @@ function extraerPortada(pagina, link) {
 }
 
 
-// ======================================================
-// DESCRIPCIÓN
-// ======================================================
 
-function extraerDescripcion(pagina) {
 
-    const posibles = [
 
-        pagina(
-            'meta[property="og:description"]'
-        ).attr("content"),
 
-        pagina(
-            'meta[name="description"]'
-        ).attr("content"),
 
-        pagina(
-            'meta[name="twitter:description"]'
-        ).attr("content")
-
-    ];
-
-    for (const descripcion of posibles) {
-
-        if (
-            descripcion &&
-            descripcion.trim().length > 10
-        ) {
-
-            return descripcion
-                .trim()
-                .replace(/\s+/g, " ");
-        }
-    }
-
-    return "";
-}
 
 
 // ======================================================
-// REPRODUCTOR
+// DETECTAR REPRODUCTOR
 // ======================================================
 
-function extraerReproductor(
-    pagina,
-    link
+async function detectarReproductor(
+    url,
+    pagina
 ) {
 
-    let reproductor = null;
+    const candidatos = [];
 
-    // --------------------------------------------------
-    // IFRAME
-    // --------------------------------------------------
+    const agregar = (
+        urlEncontrada
+    ) => {
 
-    pagina("iframe[src]").each(
-        (_, iframe) => {
+        if (!urlEncontrada) {
+            return;
+        }
 
-            if (reproductor) return;
 
-            const src =
-                pagina(iframe)
-                    .attr("src");
+        try {
 
-            if (!src) return;
+            const absoluta =
+                new URL(
+                    urlEncontrada,
+                    url
+                ).toString();
 
-            const iframeUrl =
-                unirUrl(
-                    link,
-                    src
-                );
-
-            if (!iframeUrl) return;
-
-            /*
-             * Conservamos la lógica que ya
-             * te estaba funcionando:
-             *
-             * el iframe debe pertenecer
-             * a la fuente configurada.
-             */
 
             if (
-                iframeUrl.startsWith(BASE)
+                !candidatos.includes(
+                    absoluta
+                )
             ) {
 
-                reproductor =
-                    iframeUrl;
+                candidatos.push(
+                    absoluta
+                );
+
             }
+
+        } catch {}
+
+    };
+
+
+    // ==================================================
+    // IFRAME
+    // ==================================================
+
+    pagina("iframe").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("src")
+            );
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-src")
+            );
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-url")
+            );
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-embed")
+            );
+
         }
     );
 
-    return reproductor;
+
+    // ==================================================
+    // EMBED
+    // ==================================================
+
+    pagina("embed").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("src")
+            );
+
+        }
+    );
+
+
+    // ==================================================
+    // VIDEO
+    // ==================================================
+
+    pagina("video").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("src")
+            );
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-src")
+            );
+
+        }
+    );
+
+
+    // ==================================================
+    // SOURCE
+    // ==================================================
+
+    pagina("source").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("src")
+            );
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-src")
+            );
+
+        }
+    );
+
+
+    // ==================================================
+    // ATRIBUTOS DE REPRODUCTOR
+    // ==================================================
+
+    pagina("[data-player]").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-player")
+            );
+
+        }
+    );
+
+
+    pagina("[data-video]").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-video")
+            );
+
+        }
+    );
+
+
+    pagina("[data-iframe]").each(
+        (_, elemento) => {
+
+            agregar(
+                pagina(elemento)
+                    .attr("data-iframe")
+            );
+
+        }
+    );
+
+
+    // ==================================================
+    // BUSCAR URLs DENTRO DEL HTML
+    // ==================================================
+
+    const html =
+        pagina.html() || "";
+
+
+    const regex =
+        /https?:\/\/[^\s"'<>\\]+/gi;
+
+
+    const urls =
+        html.match(regex) || [];
+
+
+    for (
+        const encontrada of urls
+    ) {
+
+        const limpia =
+            encontrada
+                .replace(
+                    /\\u002F/g,
+                    "/"
+                )
+                .replace(
+                    /\\\//g,
+                    "/"
+                )
+                .replace(
+                    /["'<>),]+$/g,
+                    ""
+                );
+
+
+        agregar(limpia);
+
+    }
+
+
+    // ==================================================
+    // PRIORIZAR REPRODUCTORES
+    // ==================================================
+
+    const prioridad = [
+
+        "play.php",
+        "/embed/",
+        "/player/",
+        "/embed-",
+        ".m3u8",
+        ".mp4"
+
+    ];
+
+
+    candidatos.sort(
+        (a, b) => {
+
+            const pa =
+                prioridad.findIndex(
+                    x =>
+                        a
+                            .toLowerCase()
+                            .includes(x)
+                );
+
+
+            const pb =
+                prioridad.findIndex(
+                    x =>
+                        b
+                            .toLowerCase()
+                            .includes(x)
+                );
+
+
+            return (
+                (pa === -1 ? 999 : pa) -
+                (pb === -1 ? 999 : pb)
+            );
+
+        }
+    );
+
+
+    // ==================================================
+    // COMPROBAR CANDIDATOS
+    // ==================================================
+
+    for (
+        const candidato of candidatos
+    ) {
+
+        try {
+
+            // ------------------------------------------
+            // M3U8 / MP4
+            // ------------------------------------------
+
+            if (
+                candidato
+                    .toLowerCase()
+                    .includes(".m3u8") ||
+
+                candidato
+                    .toLowerCase()
+                    .includes(".mp4")
+            ) {
+
+                return candidato;
+
+            }
+
+
+            // ------------------------------------------
+            // PLAY.PHP
+            // ------------------------------------------
+
+            if (
+                candidato
+                    .toLowerCase()
+                    .includes("play.php")
+            ) {
+
+                const htmlPlayer =
+                    await obtenerHTML(
+                        candidato
+                    );
+
+
+                // window.location.href
+
+                let match =
+                    htmlPlayer.match(
+                        /window\.location\.href\s*=\s*["']([^"']+)/i
+                    );
+
+
+                if (match) {
+
+                    const siguiente =
+                        unirUrl(
+                            candidato,
+                            match[1]
+                        );
+
+
+                    if (siguiente) {
+
+                        return siguiente;
+
+                    }
+
+                }
+
+
+                // location.href
+
+                match =
+                    htmlPlayer.match(
+                        /location\.href\s*=\s*["']([^"']+)/i
+                    );
+
+
+                if (match) {
+
+                    const siguiente =
+                        unirUrl(
+                            candidato,
+                            match[1]
+                        );
+
+
+                    if (siguiente) {
+
+                        return siguiente;
+
+                    }
+
+                }
+
+
+                // window.location
+
+                match =
+                    htmlPlayer.match(
+                        /window\.location\s*=\s*["']([^"']+)/i
+                    );
+
+
+                if (match) {
+
+                    const siguiente =
+                        unirUrl(
+                            candidato,
+                            match[1]
+                        );
+
+
+                    if (siguiente) {
+
+                        return siguiente;
+
+                    }
+
+                }
+
+
+                // Buscar otra URL dentro del HTML
+
+                const urlsPlayer =
+                    htmlPlayer.match(
+                        regex
+                    ) || [];
+
+
+                for (
+                    const encontrada of
+                    urlsPlayer
+                ) {
+
+                    const limpia =
+                        encontrada
+                            .replace(
+                                /\\u002F/g,
+                                "/"
+                            )
+                            .replace(
+                                /\\\//g,
+                                "/"
+                            )
+                            .replace(
+                                /["'<>),]+$/g,
+                                ""
+                            );
+
+
+                    if (
+                        limpia
+                            .toLowerCase()
+                            .includes(".m3u8") ||
+
+                        limpia
+                            .toLowerCase()
+                            .includes(".mp4") ||
+
+                        limpia
+                            .toLowerCase()
+                            .includes("/embed/") ||
+
+                        limpia
+                            .toLowerCase()
+                            .includes("/player/")
+                    ) {
+
+                        return limpia;
+
+                    }
+
+                }
+
+            }
+
+
+            // ------------------------------------------
+            // EMBED / PLAYER
+            // ------------------------------------------
+
+            if (
+
+                candidato
+                    .toLowerCase()
+                    .includes("/embed/") ||
+
+                candidato
+                    .toLowerCase()
+                    .includes("/player/") ||
+
+                candidato
+                    .toLowerCase()
+                    .includes("embed-")
+            ) {
+
+                return candidato;
+
+            }
+
+        } catch (error) {
+
+            console.log(
+                "No se pudo comprobar:",
+                candidato
+            );
+
+        }
+
+    }
+
+
+    return null;
+
 }
 
 
 // ======================================================
-// EPISODIOS
+// EXTRAER EPISODIOS
 // ======================================================
 
 function extraerEpisodios(
@@ -527,7 +978,10 @@ function extraerEpisodios(
 ) {
 
     const episodios = [];
-    const vistos = new Set();
+
+    const vistos =
+        new Set();
+
 
     pagina("a[href]").each(
         (_, elemento) => {
@@ -536,13 +990,21 @@ function extraerEpisodios(
                 pagina(elemento)
                     .text()
                     .trim()
-                    .replace(/\s+/g, " ");
+                    .replace(
+                        /\s+/g,
+                        " "
+                    );
+
 
             const href =
                 pagina(elemento)
                     .attr("href");
 
-            if (!href) return;
+
+            if (!href) {
+                return;
+            }
+
 
             const url =
                 unirUrl(
@@ -550,184 +1012,85 @@ function extraerEpisodios(
                     href
                 );
 
-            if (!url) return;
+
+            if (!url) {
+                return;
+            }
+
 
             const contenido =
                 `${texto} ${url}`
                     .toLowerCase();
 
+
+            // ------------------------------------------
+            // Episodio
+            // ------------------------------------------
+
             const pareceEpisodio =
-                /episodio|episode|capitulo|capítulo|\bep\.?\s*\d+|\b\d+x\d+\b/i
-                    .test(contenido);
+                /episodio|episode|capitulo|capítulo|\bep\.?\s*\d+|\d+x\d+/i
+                    .test(
+                        contenido
+                    );
+
 
             if (!pareceEpisodio) {
                 return;
             }
 
-            if (vistos.has(url)) {
+
+            // ------------------------------------------
+            // Evitar duplicados
+            // ------------------------------------------
+
+            if (
+                vistos.has(url)
+            ) {
+
                 return;
+
             }
 
-            if (url === paginaBase) {
-                return;
-            }
 
             vistos.add(url);
 
+
+            // ------------------------------------------
+            // Limpiar nombre
+            // ------------------------------------------
+
+            let nombre =
+                texto ||
+                `Episodio ${
+                    episodios.length + 1
+                }`;
+
+
+            nombre =
+                nombre
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
+
+
             episodios.push({
-                nombre:
-                    texto ||
-                    `Episodio ${
-                        episodios.length + 1
-                    }`,
+
+                nombre,
+
                 link: url,
+
                 video: null
+
             });
+
         }
     );
 
+
     return episodios;
-}
 
-
-// ======================================================
-// PROCESAR PÁGINA
-// ======================================================
-
-async function procesarPagina(link) {
-
-    const pagina =
-        await obtener(link);
-
-    const nombre =
-        extraerTitulo(
-            pagina,
-            link
-        );
-
-    const portada =
-        extraerPortada(
-            pagina,
-            link
-        );
-
-    const descripcion =
-        extraerDescripcion(
-            pagina
-        );
-
-    const tipo =
-        detectarTipo(
-            link,
-            nombre || ""
-        );
-
-    const reproductor =
-        extraerReproductor(
-            pagina,
-            link
-        );
-
-    const episodios =
-        extraerEpisodios(
-            pagina,
-            link
-        );
-
-    let year = null;
-    let genero = null;
-
-
-    // JSON-LD adicional
-    pagina(
-        'script[type="application/ld+json"]'
-    ).each((_, script) => {
-
-        try {
-
-            const raw =
-                pagina(script).html();
-
-            if (!raw) return;
-
-            const data =
-                JSON.parse(raw);
-
-            const objetos =
-                Array.isArray(data)
-                    ? data
-                    : (
-                        data &&
-                        typeof data ===
-                            "object"
-                    )
-                        ? (
-                            data["@graph"] ||
-                            [data]
-                        )
-                        : [];
-
-            for (const obj of objetos) {
-
-                if (
-                    !obj ||
-                    typeof obj !==
-                        "object"
-                ) {
-                    continue;
-                }
-
-                if (
-                    !year &&
-                    obj.dateCreated
-                ) {
-
-                    year =
-                        String(
-                            obj.dateCreated
-                        ).substring(0, 4);
-                }
-
-                if (
-                    !year &&
-                    obj.datePublished
-                ) {
-
-                    year =
-                        String(
-                            obj.datePublished
-                        ).substring(0, 4);
-                }
-
-                if (
-                    !genero &&
-                    obj.genre
-                ) {
-
-                    genero =
-                        Array.isArray(
-                            obj.genre
-                        )
-                            ? obj.genre.join(", ")
-                            : obj.genre;
-                }
-            }
-
-        } catch {}
-    });
-
-
-    return {
-        nombre,
-        portada,
-        descripcion,
-        year,
-        genero,
-        tipo,
-        link,
-        reproductor,
-        episodios
-    };
 }
 
 
@@ -735,34 +1098,50 @@ async function procesarPagina(link) {
 // PROCESAR EPISODIOS
 // ======================================================
 
-async function procesarEpisodios(item) {
+async function procesarEpisodios(
+    item
+) {
 
     if (
-        !Array.isArray(item.episodios) ||
-        item.episodios.length === 0
+        !Array.isArray(
+            item.episodios
+        ) ||
+        !item.episodios.length
     ) {
+
         return item;
+
     }
+
 
     const episodios = [];
 
+
     for (
-        const episodio
-        of item.episodios
+        const episodio of
+        item.episodios
     ) {
 
         try {
+
+            console.log(
+                "Procesando episodio:",
+                episodio.nombre
+            );
+
 
             const pagina =
                 await obtener(
                     episodio.link
                 );
 
+
             const reproductor =
-                extraerReproductor(
-                    pagina,
-                    episodio.link
+                await detectarReproductor(
+                    episodio.link,
+                    pagina
                 );
+
 
             episodios.push({
 
@@ -777,7 +1156,15 @@ async function procesarEpisodios(item) {
 
             });
 
-        } catch {
+
+        } catch (error) {
+
+            console.error(
+                "Error episodio:",
+                episodio.link,
+                error.message
+            );
+
 
             episodios.push({
 
@@ -791,26 +1178,423 @@ async function procesarEpisodios(item) {
                     null
 
             });
+
         }
+
     }
+
 
     item.episodios =
         episodios;
 
+
     return item;
+
 }
 
 
 // ======================================================
-// BUSCAR / LISTAR
+// PROCESAR PÁGINA
+// ======================================================
+
+async function procesarPagina(
+    link
+) {
+
+    const pagina =
+        await obtener(link);
+
+
+    let nombre = null;
+    let portada = null;
+    let descripcion = "";
+    let year = null;
+    let genero = null;
+
+
+    // ==================================================
+    // NOMBRE
+    // ==================================================
+
+    const h1 =
+        pagina("h1").first();
+
+
+    if (h1.length) {
+
+        nombre =
+            h1.text()
+                .trim()
+                .replace(
+                    /\s+/g,
+                    " "
+                );
+
+    }
+
+
+    if (!nombre) {
+
+        const ogTitle =
+            pagina(
+                'meta[property="og:title"]'
+            ).attr(
+                "content"
+            );
+
+
+        if (
+            ogTitle &&
+            !ogTitle
+                .toLowerCase()
+                .includes(
+                    "descargar peliculas gratis"
+                )
+        ) {
+
+            nombre =
+                ogTitle
+                    .trim();
+
+        }
+
+    }
+
+
+    // ==================================================
+    // DESCRIPCIÓN
+    // ==================================================
+
+    const ogDescription =
+        pagina(
+            'meta[property="og:description"]'
+        ).attr(
+            "content"
+        );
+
+
+    if (
+        ogDescription
+    ) {
+
+        descripcion =
+            ogDescription
+                .trim();
+
+    }
+
+
+    // ==================================================
+    // JSON-LD
+    // ==================================================
+
+    pagina(
+        'script[type="application/ld+json"]'
+    ).each(
+        (_, script) => {
+
+            try {
+
+                const raw =
+                    pagina(script).html();
+
+
+                if (!raw) {
+                    return;
+                }
+
+
+                const data =
+                    JSON.parse(raw);
+
+
+                let objetos = [];
+
+
+                if (
+                    Array.isArray(data)
+                ) {
+
+                    objetos = data;
+
+                } else if (
+                    data &&
+                    typeof data ===
+                        "object"
+                ) {
+
+                    objetos =
+                        data["@graph"] ||
+                        [data];
+
+                }
+
+
+                for (
+                    const obj of objetos
+                ) {
+
+                    if (
+                        !obj ||
+                        typeof obj !==
+                            "object"
+                    ) {
+
+                        continue;
+
+                    }
+
+
+                    // ------------------------------
+                    // PORTADA
+                    // ------------------------------
+
+                    if (!portada) {
+
+                        if (
+                            obj["@type"] ===
+                            "ImageObject"
+                        ) {
+
+                            portada =
+                                obj.contentUrl ||
+                                obj.url;
+
+                        }
+
+
+                        if (!portada) {
+
+                            portada =
+                                obj.image ||
+                                obj.thumbnailUrl ||
+                                null;
+
+                        }
+
+                    }
+
+
+                    // ------------------------------
+                    // AÑO
+                    // ------------------------------
+
+                    if (
+                        !year &&
+                        obj.dateCreated
+                    ) {
+
+                        year =
+                            String(
+                                obj.dateCreated
+                            ).substring(
+                                0,
+                                4
+                            );
+
+                    }
+
+
+                    // ------------------------------
+                    // GÉNERO
+                    // ------------------------------
+
+                    if (
+                        !genero &&
+                        obj.genre
+                    ) {
+
+                        genero =
+                            Array.isArray(
+                                obj.genre
+                            )
+                                ? obj.genre.join(
+                                    ", "
+                                )
+                                : obj.genre;
+
+                    }
+
+                }
+
+            } catch {}
+
+        }
+    );
+
+
+    // ==================================================
+    // OG IMAGE
+    // ==================================================
+
+    if (!portada) {
+
+        const og =
+            pagina(
+                'meta[property="og:image"]'
+            ).attr(
+                "content"
+            );
+
+
+        if (og) {
+
+            portada = og;
+
+        }
+
+    }
+
+
+    // ==================================================
+    // IMÁGENES ALTERNATIVAS
+    // ==================================================
+
+    if (!portada) {
+
+        const imagenes = [
+
+            'meta[name="twitter:image"]',
+
+            'meta[property="twitter:image"]',
+
+            'link[rel="image_src"]',
+
+            'img[src]'
+
+        ];
+
+
+        for (
+            const selector of
+            imagenes
+        ) {
+
+            if (portada) {
+                break;
+            }
+
+
+            const elemento =
+                pagina(
+                    selector
+                ).first();
+
+
+            if (!elemento.length) {
+                continue;
+            }
+
+
+            portada =
+                elemento.attr(
+                    "content"
+                ) ||
+                elemento.attr(
+                    "href"
+                ) ||
+                elemento.attr(
+                    "src"
+                ) ||
+                null;
+
+        }
+
+    }
+
+
+    // ==================================================
+    // CONVERTIR PORTADA
+    // ==================================================
+
+    if (portada) {
+
+        portada =
+            unirUrl(
+                link,
+                portada
+            );
+
+    }
+
+
+    // ==================================================
+    // TIPO
+    // ==================================================
+
+    const tipo =
+        detectarTipo(
+            link,
+            nombre || ""
+        );
+
+
+    // ==================================================
+    // REPRODUCTOR
+    // ==================================================
+
+    const reproductor =
+        await detectarReproductor(
+            link,
+            pagina
+        );
+
+
+    // ==================================================
+    // EPISODIOS
+    // ==================================================
+
+    const episodios =
+        extraerEpisodios(
+            pagina,
+            link
+        );
+
+
+    return {
+
+        nombre:
+            nombre ||
+            "Sin título",
+
+        portada:
+
+            portada ||
+            null,
+
+        descripcion,
+
+        year,
+
+        genero,
+
+        tipo,
+
+        link,
+
+        reproductor,
+
+        episodios
+
+    };
+
+}
+
+
+// ======================================================
+// BUSCAR
 // ======================================================
 
 async function buscar(
-    termino,
-    seccion = null
+    termino
 ) {
 
     let url;
+
+
+    // --------------------------------------------------
+    // Búsqueda normal
+    // --------------------------------------------------
 
     if (termino) {
 
@@ -823,38 +1607,192 @@ async function buscar(
 
     } else {
 
-        if (seccion === "series") {
+        /*
+         * Para catálogo inicial usamos
+         * las tres secciones.
+         */
 
-            url =
-                BASE +
-                "/series/";
+        const secciones = [
 
-        } else if (
-            seccion === "animes"
+            "/peliculas/",
+            "/series/",
+            "/animes/"
+
+        ];
+
+
+        const todos =
+            new Set();
+
+
+        for (
+            const seccion of
+            secciones
         ) {
 
-            url =
-                BASE +
-                "/animes/";
+            try {
 
-        } else {
+                const pagina =
+                    await obtener(
+                        BASE + seccion
+                    );
 
-            url =
-                BASE +
-                "/peliculas/";
+
+                pagina(
+                    "a[href]"
+                ).each(
+                    (_, elemento) => {
+
+                        let href =
+                            pagina(elemento)
+                                .attr(
+                                    "href"
+                                );
+
+
+                        if (!href) {
+                            return;
+                        }
+
+
+                        href =
+                            unirUrl(
+                                BASE,
+                                href
+                            );
+
+
+                        if (!href) {
+                            return;
+                        }
+
+
+                        href =
+                            limpiarUrl(
+                                href
+                            );
+
+
+                        const permitido =
+
+                            href.startsWith(
+                                BASE +
+                                "/peliculas/"
+                            ) ||
+
+                            href.startsWith(
+                                BASE +
+                                "/series/"
+                            ) ||
+
+                            href.startsWith(
+                                BASE +
+                                "/anime/"
+                            ) ||
+
+                            href.startsWith(
+                                BASE +
+                                "/animes/"
+                            );
+
+
+                        if (
+                            !permitido
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            /\/page\/\d+\/?$/
+                                .test(
+                                    href
+                                )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            href ===
+                            limpiarUrl(
+                                BASE +
+                                "/peliculas/"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            href ===
+                            limpiarUrl(
+                                BASE +
+                                "/series/"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            href ===
+                            limpiarUrl(
+                                BASE +
+                                "/animes/"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        todos.add(
+                            href
+                        );
+
+                    }
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "Error sección:",
+                    seccion,
+                    error.message
+                );
+
+            }
 
         }
+
+
+        url = null;
+
+
+        return procesarLista(
+            Array.from(todos)
+        );
+
     }
 
 
-    console.log(
-        "Consultando:",
-        url
-    );
-
+    // --------------------------------------------------
+    // Página de búsqueda
+    // --------------------------------------------------
 
     const pagina =
         await obtener(url);
+
 
     const links =
         new Set();
@@ -867,129 +1805,99 @@ async function buscar(
                 pagina(elemento)
                     .attr("href");
 
-            if (!href) return;
 
-            try {
-
-                href =
-                    unirUrl(
-                        BASE,
-                        href
-                    );
-
-                href =
-                    limpiarUrl(
-                        href
-                    );
-
-            } catch {
-
+            if (!href) {
                 return;
             }
 
-            if (!href) return;
+
+            href =
+                unirUrl(
+                    BASE,
+                    href
+                );
 
 
-            const esPelicula =
+            if (!href) {
+                return;
+            }
+
+
+            href =
+                limpiarUrl(
+                    href
+                );
+
+
+            const permitido =
+
                 href.startsWith(
                     BASE +
                     "/peliculas/"
-                );
+                ) ||
 
-            const esSerie =
                 href.startsWith(
                     BASE +
                     "/series/"
-                );
+                ) ||
 
-            const esAnime =
+                href.startsWith(
+                    BASE +
+                    "/anime/"
+                ) ||
+
                 href.startsWith(
                     BASE +
                     "/animes/"
                 );
 
 
-            if (
-                !esPelicula &&
-                !esSerie &&
-                !esAnime
-            ) {
+            if (!permitido) {
                 return;
             }
 
 
-            // Evitar páginas principales
             if (
-                href ===
-                    limpiarUrl(
-                        BASE +
-                        "/peliculas/"
-                    ) ||
-                href ===
-                    limpiarUrl(
-                        BASE +
-                        "/series/"
-                    ) ||
-                href ===
-                    limpiarUrl(
-                        BASE +
-                        "/animes/"
+                /\/page\/\d+\/?$/
+                    .test(
+                        href
                     )
             ) {
+
                 return;
+
             }
 
 
-            // Evitar paginación
-            if (
-                /\/page\/\d+\/?$/.test(
-                    href
-                )
-            ) {
-                return;
-            }
+            links.add(
+                href
+            );
 
-
-            // Mantener la sección solicitada
-            if (
-                !termino &&
-                seccion === "peliculas" &&
-                !esPelicula
-            ) {
-                return;
-            }
-
-            if (
-                !termino &&
-                seccion === "series" &&
-                !esSerie
-            ) {
-                return;
-            }
-
-            if (
-                !termino &&
-                seccion === "animes" &&
-                !esAnime
-            ) {
-                return;
-            }
-
-
-            links.add(href);
         }
     );
 
 
-    const lista =
-        Array.from(links).sort();
+    return procesarLista(
+        Array.from(links)
+    );
 
+}
+
+
+// ======================================================
+// PROCESAR LISTA
+// ======================================================
+
+async function procesarLista(
+    lista
+) {
 
     const resultados = [];
 
     /*
      * Límite para no saturar Render.
      */
+
     const limite =
         Math.min(
             lista.length,
@@ -1005,46 +1913,66 @@ async function buscar(
 
         try {
 
+            console.log(
+                `[${i + 1}/${limite}]`,
+                lista[i]
+            );
+
+
             let item =
                 await procesarPagina(
                     lista[i]
                 );
 
 
+            /*
+             * Series y anime:
+             * procesar sus episodios.
+             */
+
             if (
-                item.tipo === "Serie" ||
-                item.tipo === "Anime"
+                item.tipo ===
+                    "Serie" ||
+
+                item.tipo ===
+                    "Anime"
             ) {
 
                 item =
                     await procesarEpisodios(
                         item
                     );
+
             }
 
 
-            resultados.push(item);
+            /*
+             * Si no tiene reproductor
+             * y tampoco episodios con
+             * reproductor, se conserva
+             * igualmente para mostrarlo.
+             */
 
-
-            console.log(
-                `[${i + 1}/${limite}] ${
-                    item.nombre ||
-                    lista[i]
-                }`
+            resultados.push(
+                item
             );
 
 
         } catch (error) {
 
             console.error(
-                `[ERROR] ${lista[i]}`,
+                "Error procesando:",
+                lista[i],
                 error.message
             );
+
         }
+
     }
 
 
     return resultados;
+
 }
 
 
@@ -1063,14 +1991,18 @@ app.get(
                     req.query.q || ""
                 ).trim();
 
+
             if (!termino) {
 
                 return res
                     .status(400)
                     .json({
+
                         error:
                             "Escribe algo para buscar"
+
                     });
+
             }
 
 
@@ -1081,28 +2013,37 @@ app.get(
 
 
             res.json({
+
                 resultados
+
             });
+
 
         } catch (error) {
 
             console.error(error);
 
+
             res
                 .status(500)
                 .json({
+
                     error:
                         "No se pudo realizar la búsqueda",
+
                     detalle:
                         error.message
+
                 });
+
         }
+
     }
 );
 
 
 // ======================================================
-// PELÍCULAS
+// CATÁLOGO
 // ======================================================
 
 app.get(
@@ -1113,107 +2054,221 @@ app.get(
 
             const resultados =
                 await buscar(
-                    "",
-                    "peliculas"
+                    ""
                 );
 
+
             res.json({
+
                 resultados
+
             });
+
 
         } catch (error) {
 
             console.error(error);
 
+
             res
                 .status(500)
                 .json({
+
                     error:
                         "No se pudo cargar el catálogo",
+
                     detalle:
                         error.message
+
                 });
+
         }
+
     }
 );
 
 
 // ======================================================
-// SERIES
+// SECCIÓN ESPECÍFICA
 // ======================================================
 
 app.get(
-    "/api/series",
+    "/api/seccion/:tipo",
     async (req, res) => {
 
         try {
 
-            const resultados =
-                await buscar(
-                    "",
-                    "series"
+            let tipo =
+                String(
+                    req.params.tipo
+                )
+                    .toLowerCase()
+                    .replace(
+                        /^\/|\/$/g,
+                        ""
+                    );
+
+
+            const secciones = {
+
+                peliculas:
+                    "/peliculas/",
+
+                series:
+                    "/series/",
+
+                anime:
+                    "/animes/",
+
+                animes:
+                    "/animes/"
+
+            };
+
+
+            if (
+                !secciones[tipo]
+            ) {
+
+                return res
+                    .status(400)
+                    .json({
+
+                        error:
+                            "Sección no válida"
+
+                    });
+
+            }
+
+
+            const pagina =
+                await obtener(
+                    BASE +
+                    secciones[tipo]
                 );
 
+
+            const links =
+                new Set();
+
+
+            pagina("a[href]").each(
+                (_, elemento) => {
+
+                    let href =
+                        pagina(elemento)
+                            .attr(
+                                "href"
+                            );
+
+
+                    if (!href) {
+                        return;
+                    }
+
+
+                    href =
+                        unirUrl(
+                            BASE,
+                            href
+                        );
+
+
+                    if (!href) {
+                        return;
+                    }
+
+
+                    href =
+                        limpiarUrl(
+                            href
+                        );
+
+
+                    if (
+                        !href.startsWith(
+                            BASE +
+                            secciones[tipo]
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    if (
+                        href ===
+                        limpiarUrl(
+                            BASE +
+                            secciones[tipo]
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    if (
+                        /\/page\/\d+\/?$/
+                            .test(
+                                href
+                            )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    links.add(
+                        href
+                    );
+
+                }
+            );
+
+
+            const resultados =
+                await procesarLista(
+                    Array.from(links)
+                );
+
+
             res.json({
+
                 resultados
+
             });
+
 
         } catch (error) {
 
             console.error(error);
 
+
             res
                 .status(500)
                 .json({
+
                     error:
-                        "No se pudieron cargar las series",
+                        "No se pudo cargar la sección",
+
                     detalle:
                         error.message
+
                 });
+
         }
+
     }
 );
 
 
 // ======================================================
-// ANIME
-// ======================================================
-
-app.get(
-    "/api/animes",
-    async (req, res) => {
-
-        try {
-
-            const resultados =
-                await buscar(
-                    "",
-                    "animes"
-                );
-
-            res.json({
-                resultados
-            });
-
-        } catch (error) {
-
-            console.error(error);
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        "No se pudo cargar el anime",
-                    detalle:
-                        error.message
-                });
-        }
-    }
-);
-
-
-// ======================================================
-// FRONTEND
+// ARCHIVOS FRONTEND
 // ======================================================
 
 app.use(
@@ -1227,7 +2282,7 @@ app.use(
 
 
 // ======================================================
-// RUTAS DE INTERFAZ
+// RUTAS DE SECCIONES
 // ======================================================
 
 app.get(
@@ -1241,8 +2296,10 @@ app.get(
                 "index.html"
             )
         );
+
     }
 );
+
 
 app.get(
     "/series",
@@ -1255,8 +2312,10 @@ app.get(
                 "index.html"
             )
         );
+
     }
 );
+
 
 app.get(
     "/animes",
@@ -1269,12 +2328,13 @@ app.get(
                 "index.html"
             )
         );
+
     }
 );
 
 
 // ======================================================
-// INICIO
+// RUTA PRINCIPAL
 // ======================================================
 
 app.get(
@@ -1288,6 +2348,7 @@ app.get(
                 "index.html"
             )
         );
+
     }
 );
 
@@ -1307,5 +2368,6 @@ app.listen(
         console.log(
             `Fuente: ${BASE}`
         );
+
     }
 );
