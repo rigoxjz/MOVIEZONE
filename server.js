@@ -51,6 +51,8 @@ const PORT = process.env.PORT || 3000;
 const BASE = process.env.SOURCE_URL || "https://lamovie.org";
 const API  = "https://lamovie.org/wp-api/v1";
 const IMG  = "https://lamovie.org/wp-content/uploads";
+// Fuente de respaldo (Hackstore)
+const HACKSTORE_BASE = process.env.HACKSTORE_URL || "https://www.hackstore.fo";
 
 const GENRES = {
     17: "Drama", 18: "Comedia", 33: "Suspense", 32: "Acción", 520: "Animación",
@@ -314,6 +316,490 @@ async function obtenerHTML(url) {
     return respuesta.data;
 }
 
+
+
+// ======================================================
+// HACKSTORE (fuente de respaldo - solo se usa si Lamovie falla)
+// ======================================================
+
+function esYouTube(url) {
+    if (!url) return false;
+    const u = String(url).toLowerCase();
+    return (
+        u.includes("youtube.com") ||
+        u.includes("youtu.be") ||
+        u.includes("youtube-nocookie.com")
+    );
+}
+
+function esReproductorLamovie(url) {
+    if (!url) return false;
+    const u = String(url).toLowerCase();
+    return u.includes("lamovie.org") || u.includes("lamovie");
+}
+
+function esReproductorValido(url) {
+    if (!url) return false;
+    if (esYouTube(url)) return false;
+    if (esReproductorLamovie(url)) return false;
+    return true;
+}
+
+async function obtenerHackstore(url) {
+    const respuesta = await session.get(url, {
+        headers: {
+            ...HEADERS,
+            "Referer": HACKSTORE_BASE + "/"
+        },
+        timeout: 25000
+    });
+    return cheerio.load(respuesta.data);
+}
+
+function detectarTipoHackstore(url, nombre = "") {
+    const texto = `${url} ${nombre}`.toLowerCase();
+    if (texto.includes("/anime/") || texto.includes("/animes/") || texto.includes("anime")) return "Anime";
+    if (texto.includes("/series/") || texto.includes("serie")) return "Serie";
+    return "Película";
+}
+
+function esTituloGenericoHack(texto) {
+    if (!texto) return true;
+    const t = String(texto).trim().toLowerCase().replace(/\s+/g, " ");
+    if (t.length < 2) return true;
+    const genericos = [
+        "descargar peliculas gratis", "descargar películas gratis",
+        "peliculas gratis", "películas gratis", "por mega", "google drive",
+        "más en 1 link", "mas en 1 link", "ver peliculas gratis", "ver películas gratis"
+    ];
+    return genericos.some(p => t.includes(p));
+}
+
+function extraerTituloHackstore(pagina, link) {
+    let nombre = null;
+    pagina("h1").each((_, el) => {
+        if (nombre) return;
+        const texto = pagina(el).text().trim().replace(/\s+/g, " ");
+        if (!esTituloGenericoHack(texto)) nombre = texto;
+    });
+    if (!nombre) {
+        const titulo = pagina('meta[property="og:title"]').attr("content");
+        if (titulo && !esTituloGenericoHack(titulo)) nombre = titulo.trim().replace(/\s+/g, " ");
+    }
+    if (!nombre) {
+        const titulo = pagina("title").first().text().trim().replace(/\s+/g, " ");
+        if (titulo && !esTituloGenericoHack(titulo)) nombre = titulo;
+    }
+    if (!nombre) {
+        try {
+            const url = new URL(link);
+            const partes = url.pathname.split("/").filter(Boolean);
+            if (partes.length) {
+                let slug = partes[partes.length - 1]
+                    .replace(/-\d{4}$/, "")
+                    .replace(/[-_]+/g, " ")
+                    .trim();
+                if (slug) {
+                    nombre = slug.replace(/\b\w/g, l => l.toUpperCase());
+                }
+            }
+        } catch {}
+    }
+    if (nombre) {
+        nombre = nombre
+            .replace(/\s*\|\s*MisVideos.*$/i, "")
+            .replace(/\s*-\s*MisVideos.*$/i, "")
+            .trim();
+    }
+    return nombre;
+}
+
+function extraerPortadaHackstore(pagina, link) {
+    const candidatos = [];
+    function agregar(urlImg) {
+        if (!urlImg) return;
+        try {
+            let limpia = String(urlImg).trim();
+            if (limpia.includes(" ")) limpia = limpia.split(/\s+/)[0];
+            const absoluta = unirUrl(link, limpia);
+            if (!absoluta) return;
+            if (!candidatos.includes(absoluta)) candidatos.push(absoluta);
+        } catch {}
+    }
+
+    pagina('script[type="application/ld+json"]').each((_, script) => {
+        try {
+            const raw = pagina(script).html();
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            let objetos = Array.isArray(data) ? data : (data && typeof data === "object" ? (data["@graph"] || [data]) : []);
+            for (const obj of objetos) {
+                if (!obj || typeof obj !== "object") continue;
+                if (obj["@type"] === "ImageObject") agregar(obj.contentUrl || obj.url);
+                if (typeof obj.image === "string") agregar(obj.image);
+                if (obj.image && typeof obj.image === "object") agregar(obj.image.url || obj.image.contentUrl);
+                agregar(obj.thumbnailUrl);
+            }
+        } catch {}
+    });
+
+    agregar(pagina('meta[property="og:image"]').attr("content"));
+    agregar(pagina('meta[property="og:image:secure_url"]').attr("content"));
+    agregar(pagina('meta[name="twitter:image"]').attr("content"));
+    agregar(pagina('meta[itemprop="image"]').attr("content"));
+
+    pagina("img").each((_, img) => {
+        const el = pagina(img);
+        const posibles = [el.attr("src"), el.attr("data-src"), el.attr("data-lazy-src"), el.attr("data-original"), el.attr("srcset")];
+        for (const imagen of posibles) {
+            if (!imagen) continue;
+            const texto = imagen.toLowerCase();
+            if (texto.includes("logo") || texto.includes("avatar") || texto.includes("icon") ||
+                texto.includes("banner") || texto.includes("placeholder") || texto.includes("loading") ||
+                texto.includes("spinner") || texto.includes("1x1") || texto.includes("pixel")) continue;
+            agregar(imagen);
+        }
+    });
+
+    if (candidatos.length === 0) {
+        return "https://via.placeholder.com/300x450/111111/ffffff?text=Sin+Portada";
+    }
+
+    candidatos.sort((a, b) => {
+        const score = (u) => {
+            let s = 0;
+            const low = u.toLowerCase();
+            if (low.includes("image.tmdb.org") || low.includes("tmdb.org")) s += 100;
+            if (low.includes("poster") || low.includes("cover") || low.includes("portada")) s += 50;
+            if (low.includes("/w500/") || low.includes("/w300/") || low.includes("/original/")) s += 30;
+            if (low.includes(".jpg") || low.includes(".jpeg") || low.includes(".webp") || low.includes(".png")) s += 10;
+            return s;
+        };
+        return score(b) - score(a);
+    });
+
+    return candidatos[0];
+}
+
+function extraerDescripcionHackstore(pagina) {
+    const posibles = [
+        pagina('meta[property="og:description"]').attr("content"),
+        pagina('meta[name="description"]').attr("content"),
+        pagina('meta[name="twitter:description"]').attr("content")
+    ];
+    for (const d of posibles) {
+        if (d && d.trim().length > 10) return d.trim().replace(/\s+/g, " ");
+    }
+    return "";
+}
+
+async function extraerReproductorHackstore(url, $pagina) {
+    const candidatos = [];
+    function agregar(urlEncontrada) {
+        if (!urlEncontrada) return;
+        try {
+            const absoluta = new URL(urlEncontrada, url).toString();
+            if (!candidatos.includes(absoluta)) candidatos.push(absoluta);
+        } catch {}
+    }
+
+    $pagina("iframe").each((_, el) => {
+        agregar($pagina(el).attr("src"));
+        agregar($pagina(el).attr("data-src"));
+        agregar($pagina(el).attr("data-url"));
+        agregar($pagina(el).attr("data-embed"));
+    });
+    $pagina("embed").each((_, el) => agregar($pagina(el).attr("src")));
+    $pagina("video, source").each((_, el) => {
+        agregar($pagina(el).attr("src"));
+        agregar($pagina(el).attr("data-src"));
+    });
+    $pagina("[data-player], [data-video], [data-iframe]").each((_, el) => {
+        agregar($pagina(el).attr("data-player") || $pagina(el).attr("data-video") || $pagina(el).attr("data-iframe"));
+    });
+
+    const html = $pagina.html() || "";
+    const regex = /https?:\/\/[^\s"'<>\\]+/gi;
+    const urls = html.match(regex) || [];
+    for (const encontrada of urls) {
+        let limpia = encontrada.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
+        agregar(limpia);
+    }
+
+    const prioridad = ["play.php", "/embed/", "/player/", "/embed-", "iframe", ".m3u8", ".mp4"];
+    candidatos.sort((a, b) => {
+        const pa = prioridad.findIndex(x => a.toLowerCase().includes(x));
+        const pb = prioridad.findIndex(x => b.toLowerCase().includes(x));
+        return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
+    });
+
+    for (const candidato of candidatos) {
+        try {
+            if (candidato.includes(".m3u8") || candidato.includes(".mp4")) return candidato;
+
+            if (candidato.includes("play.php")) {
+                const htmlPlayer = await obtenerHTML(candidato);
+                const match = htmlPlayer.match(/window\.location\.href\s*=\s*["']([^"']+)/i) ||
+                              htmlPlayer.match(/location\.href\s*=\s*["']([^"']+)/i);
+                if (match) {
+                    const siguiente = unirUrl(candidato, match[1]);
+                    if (siguiente) return siguiente;
+                }
+                const urlsPlayer = htmlPlayer.match(regex) || [];
+                for (const urlPlayer of urlsPlayer) {
+                    const limpia = urlPlayer.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
+                    if (limpia.includes(".m3u8") || limpia.includes(".mp4") || limpia.includes("/embed/") || limpia.includes("/player/")) {
+                        return limpia;
+                    }
+                }
+            }
+
+            if (candidato.includes("/embed/") || candidato.includes("/player/") || candidato.includes("embed-")) {
+                return candidato;
+            }
+        } catch {}
+    }
+    return null;
+}
+
+function extraerEpisodiosHackstore(pagina, paginaBase) {
+    const episodios = [];
+    const vistos = new Set();
+
+    pagina("a[href]").each((_, elemento) => {
+        let texto = pagina(elemento).text().trim().replace(/\s+/g, " ");
+        texto = texto
+            .replace(/\.text\s*\{[^}]*\}/gi, "")
+            .replace(/font-size:[^;]+;/gi, "")
+            .replace(/font-weight:[^;]+;/gi, "")
+            .replace(/fill:\s*#[0-9a-f]+;/gi, "")
+            .replace(/\{[^}]*\}/g, "")
+            .trim();
+
+        const match = texto.match(/(\d+\s*[x×]\s*\d+|episodio\s*\d+|ep\.?\s*\d+|capítulo\s*\d+|capitulo\s*\d+)/i);
+        if (match) texto = match[0].replace(/\s+/g, "");
+
+        if (!texto || texto.length < 2 || texto.toLowerCase().includes("disponible")) {
+            const href = pagina(elemento).attr("href") || "";
+            const matchHref = href.match(/(\d+[x×]\d+|episodio[-_]?\d+|ep[-_]?\d+)/i);
+            if (matchHref) texto = matchHref[0].replace(/[-_]/g, " ");
+            else return;
+        }
+
+        const href = pagina(elemento).attr("href");
+        if (!href) return;
+        const url = unirUrl(paginaBase, href);
+        if (!url) return;
+
+        const contenido = `${texto} ${url}`.toLowerCase();
+        const pareceEpisodio = /episodio|episode|capitulo|capítulo|\bep\.?\s*\d+|\b\d+x\d+\b/i.test(contenido);
+        if (!pareceEpisodio || vistos.has(url) || url === paginaBase) return;
+
+        vistos.add(url);
+        episodios.push({
+            nombre: texto || `Episodio ${episodios.length + 1}`,
+            link: url,
+            video: null,
+            embeds: [],
+            downloads: [],
+            soloTrailer: false
+        });
+    });
+    return episodios;
+}
+
+async function procesarPaginaHackstore(link) {
+    const pagina = await obtenerHackstore(link);
+    const nombre = extraerTituloHackstore(pagina, link);
+    const portada = extraerPortadaHackstore(pagina, link);
+    const descripcion = extraerDescripcionHackstore(pagina);
+    const tipo = detectarTipoHackstore(link, nombre || "");
+    let reproductor = await extraerReproductorHackstore(link, pagina);
+
+    let soloTrailer = false;
+    if (esYouTube(reproductor)) {
+        soloTrailer = true;
+        reproductor = null;
+    }
+
+    const episodios = extraerEpisodiosHackstore(pagina, link);
+
+    let year = null;
+    let genero = null;
+    pagina('script[type="application/ld+json"]').each((_, script) => {
+        try {
+            const raw = pagina(script).html();
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            const objetos = Array.isArray(data) ? data : (data && typeof data === "object" ? (data["@graph"] || [data]) : []);
+            for (const obj of objetos) {
+                if (!obj || typeof obj !== "object") continue;
+                if (!year && (obj.dateCreated || obj.datePublished)) {
+                    year = String(obj.dateCreated || obj.datePublished).substring(0, 4);
+                }
+                if (!genero && obj.genre) {
+                    genero = Array.isArray(obj.genre) ? obj.genre.join(", ") : obj.genre;
+                }
+            }
+        } catch {}
+    });
+
+    let nombreFinal = nombre || "Sin título";
+    if (soloTrailer) nombreFinal = `${nombreFinal} (Solo trailer - No disponible)`;
+
+    // Procesar solo los primeros episodios para no demorar
+    const episodiosProcesados = [];
+    const limiteEp = Math.min(episodios.length, 12);
+    for (let i = 0; i < limiteEp; i++) {
+        const ep = episodios[i];
+        try {
+            const epPagina = await obtenerHackstore(ep.link);
+            let video = await extraerReproductorHackstore(ep.link, epPagina);
+            let epSoloTrailer = false;
+            if (esYouTube(video)) {
+                epSoloTrailer = true;
+                video = null;
+            }
+            episodiosProcesados.push({
+                nombre: epSoloTrailer ? `${ep.nombre} (Solo trailer)` : ep.nombre,
+                link: ep.link,
+                video,
+                embeds: video ? [{ url: video, server: "Hackstore", name: "Hackstore" }] : [],
+                downloads: [],
+                soloTrailer: epSoloTrailer
+            });
+        } catch {
+            episodiosProcesados.push({ ...ep, video: null, embeds: [], downloads: [], soloTrailer: false });
+        }
+    }
+
+    return {
+        nombre: nombreFinal,
+        titulo_original: null,
+        portada,
+        backdrop: null,
+        descripcion,
+        year,
+        genero,
+        tipo,
+        idiomas: [],
+        calidad: [],
+        paises: [],
+        calificacion: null,
+        calificacion_comunidad: null,
+        votos: null,
+        fecha_estreno: null,
+        duracion: null,
+        certificacion: null,
+        ultimo_episodio: null,
+        link,
+        reproductor: reproductor || null,
+        embeds: reproductor ? [{ url: reproductor, server: "Hackstore", name: "Hackstore" }] : [],
+        downloads: [],
+        soloTrailer,
+        episodios: episodiosProcesados,
+        temporadas: [],
+        postId: null,
+        fuente: "hackstore"
+    };
+}
+
+async function buscarEnHackstore(termino, seccion = null, limit = 20) {
+    try {
+        let url;
+        if (termino) {
+            url = `${HACKSTORE_BASE}/?s=${encodeURIComponent(termino)}`;
+        } else {
+            if (seccion === "series") url = `${HACKSTORE_BASE}/series/`;
+            else if (seccion === "animes" || seccion === "anime") url = `${HACKSTORE_BASE}/animes/`;
+            else url = `${HACKSTORE_BASE}/peliculas/`;
+        }
+
+        console.log(`[Hackstore] Consultando: ${url}`);
+        const pagina = await obtenerHackstore(url);
+        const links = new Set();
+
+        pagina("a[href]").each((_, el) => {
+            let href = pagina(el).attr("href");
+            if (!href) return;
+            try {
+                href = unirUrl(HACKSTORE_BASE, href);
+                href = limpiarUrl(href);
+            } catch { return; }
+            if (!href) return;
+
+            const esPelicula = href.startsWith(HACKSTORE_BASE + "/peliculas/");
+            const esSerie = href.startsWith(HACKSTORE_BASE + "/series/");
+            const esAnime = href.startsWith(HACKSTORE_BASE + "/animes/");
+
+            if (!esPelicula && !esSerie && !esAnime) return;
+            if (href === limpiarUrl(HACKSTORE_BASE + "/peliculas/") ||
+                href === limpiarUrl(HACKSTORE_BASE + "/series/") ||
+                href === limpiarUrl(HACKSTORE_BASE + "/animes/")) return;
+            if (/\/page\/\d+\/?$/.test(href)) return;
+
+            if (!termino) {
+                if (seccion === "peliculas" && !esPelicula) return;
+                if (seccion === "series" && !esSerie) return;
+                if ((seccion === "animes" || seccion === "anime") && !esAnime) return;
+            }
+
+            links.add(href);
+        });
+
+        const lista = Array.from(links).slice(0, limit);
+        const resultados = [];
+
+        for (let i = 0; i < lista.length; i++) {
+            try {
+                const item = await procesarPaginaHackstore(lista[i]);
+                resultados.push(item);
+                console.log(`[Hackstore ${i + 1}/${lista.length}] ${item.nombre}`);
+            } catch (err) {
+                console.error(`[Hackstore ERROR] ${lista[i]}:`, err.message);
+            }
+        }
+
+        return resultados;
+    } catch (err) {
+        console.error("[Hackstore] Error general:", err.message);
+        return [];
+    }
+}
+
+async function buscarPlayerEnHackstorePorTitulo(nombre) {
+    if (!nombre) return null;
+    try {
+        const limpio = String(nombre)
+            .replace(/\s*\(Solo trailer.*?\)/gi, "")
+            .replace(/\s*-\s*No disponible.*/gi, "")
+            .trim();
+
+        const resultados = await buscarEnHackstore(limpio, null, 5);
+        if (!resultados.length) return null;
+
+        const nombreLower = limpio.toLowerCase();
+        let mejor = resultados.find(r => 
+            (r.nombre || "").toLowerCase().includes(nombreLower) || 
+            nombreLower.includes((r.nombre || "").toLowerCase())
+        );
+        if (!mejor) mejor = resultados[0];
+
+        if (mejor && esReproductorValido(mejor.reproductor)) {
+            return mejor;
+        }
+        if (mejor && Array.isArray(mejor.episodios)) {
+            const epConVideo = mejor.episodios.find(e => esReproductorValido(e.video));
+            if (epConVideo) return mejor;
+        }
+        return null;
+    } catch (err) {
+        console.error("[Hackstore] Error buscando player por título:", err.message);
+        return null;
+    }
+}
+
+
 function resolveIds(ids, mapping) {
     if (!ids) return [];
     if (!Array.isArray(ids)) ids = [ids];
@@ -555,48 +1041,85 @@ async function getEpisodes(serieId, season = 1) {
 }
 
 async function enriquecerItem(item) {
-    if (!item.postId) return item;
+    if (!item.postId && !item.fuente) return item;
 
-    // Obtener reproductor y descargas del título principal
-    const playerData = await getPlayer(item.postId);
-    item.reproductor = playerData.reproductor;
-    item.downloads = playerData.downloads || [];
-    item.embeds = playerData.embeds || [];
+    // Si ya viene de Hackstore, no hace falta enriquecer más
+    if (item.fuente === "hackstore") return item;
 
-    if (item.reproductor && (item.reproductor.includes("youtube.com") || item.reproductor.includes("youtu.be"))) {
-        item.soloTrailer = true;
-        if (item.nombre && !item.nombre.includes("Solo trailer")) {
-            item.nombre = `${item.nombre} (Solo trailer - No disponible)`;
+    if (item.postId) {
+        // Obtener reproductor y descargas del título principal (Lamovie)
+        const playerData = await getPlayer(item.postId);
+        item.reproductor = playerData.reproductor;
+        item.downloads = playerData.downloads || [];
+        item.embeds = playerData.embeds || [];
+
+        if (item.reproductor && (item.reproductor.includes("youtube.com") || item.reproductor.includes("youtu.be"))) {
+            item.soloTrailer = true;
+            if (item.nombre && !item.nombre.includes("Solo trailer")) {
+                item.nombre = `${item.nombre} (Solo trailer - No disponible)`;
+            }
+        }
+
+        // Si es serie o anime → cargar temporadas y episodios
+        if (item.tipo === "Serie" || item.tipo === "Anime") {
+            const epData = await getEpisodes(item.postId, 1);
+            let seasons = epData.seasons || [];
+            if (!seasons.length) seasons = [1];
+            seasons = [...new Set(seasons.map(s => parseInt(s)))].sort((a, b) => a - b);
+
+            item.temporadas = seasons;
+            item.episodios = [];
+
+            const posts = epData.posts || [];
+
+            for (const ep of posts) {
+                const epPlayer = await getPlayer(ep._id);
+                item.episodios.push({
+                    id: ep._id,
+                    nombre: ep.title || `T${ep.season_number}E${String(ep.episode_number).padStart(2, "0")}`,
+                    season: ep.season_number,
+                    episode: ep.episode_number,
+                    video: epPlayer.reproductor || null,
+                    embeds: epPlayer.embeds || [],
+                    downloads: epPlayer.downloads || [],
+                    soloTrailer: epPlayer.reproductor
+                        ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be"))
+                        : false
+                });
+            }
         }
     }
 
-    // Si es serie o anime → cargar temporadas y episodios
-if (item.tipo === "Serie" || item.tipo === "Anime") {
-        const epData = await getEpisodes(item.postId, 1);
-        let seasons = epData.seasons || [];
-        if (!seasons.length) seasons = [1];
-        seasons = [...new Set(seasons.map(s => parseInt(s)))].sort((a, b) => a - b);
+    // ======================================================
+    // CASO ESPECIAL: Si el reproductor es de "lamovie" o no válido,
+    // intentamos encontrar uno bueno en Hackstore
+    // ======================================================
+    const playerMalo =
+        !item.reproductor ||
+        esReproductorLamovie(item.reproductor) ||
+        esYouTube(item.reproductor) ||
+        (Array.isArray(item.embeds) && item.embeds.every(e => esReproductorLamovie(e.url) || esYouTube(e.url)));
 
-        item.temporadas = seasons;
-        item.episodios = [];
-
-        // Cargamos la primera temporada por defecto
-        const posts = epData.posts || [];
-
-        for (const ep of posts) {
-            const epPlayer = await getPlayer(ep._id);
-            item.episodios.push({
-                id: ep._id,
-                nombre: ep.title || `T${ep.season_number}E${String(ep.episode_number).padStart(2, "0")}`,
-                season: ep.season_number,
-                episode: ep.episode_number,
-                video: epPlayer.reproductor || null,
-                embeds: epPlayer.embeds || [],
-                downloads: epPlayer.downloads || [],
-                soloTrailer: epPlayer.reproductor
-                    ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be"))
-                    : false
-            });
+    if (playerMalo && item.nombre) {
+        console.log(`[Fallback] Player malo/lamovie detectado en "${item.nombre}". Buscando en Hackstore...`);
+        try {
+            const alternativo = await buscarPlayerEnHackstorePorTitulo(item.nombre);
+            if (alternativo && esReproductorValido(alternativo.reproductor)) {
+                console.log(`[Fallback] ¡Encontrado player bueno en Hackstore para "${item.nombre}"!`);
+                item.reproductor = alternativo.reproductor;
+                item.embeds = alternativo.embeds || [{ url: alternativo.reproductor, server: "Hackstore", name: "Hackstore" }];
+                item.soloTrailer = false;
+                item.nombre = item.nombre
+                    .replace(/\s*\(Solo trailer.*?\)/gi, "")
+                    .replace(/\s*-\s*No disponible.*/gi, "")
+                    .trim();
+                if ((item.tipo === "Serie" || item.tipo === "Anime") && Array.isArray(alternativo.episodios) && alternativo.episodios.length > 0) {
+                    item.episodios = alternativo.episodios;
+                }
+                item.fuente = "hackstore-fallback";
+            }
+        } catch (err) {
+            console.error("[Fallback] Error buscando alternativa en Hackstore:", err.message);
         }
     }
 
@@ -1421,8 +1944,8 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
     }
 
-    // 3. TERCERO: API externa (aquí sigue tu código actual)
-    console.log("Cache miss + Supabase vacío o búsqueda → usando nueva API...");
+    // 3. TERCERO: API de Lamovie
+    console.log("Cache miss + Supabase vacío o búsqueda → usando API de Lamovie...");
 
     let resultados = [];
 
@@ -1436,21 +1959,18 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             resultados = await listSection(section, page, limit);
         }
 
-        // Enriquecer solo los primeros
-        // Enriquecer solo los primeros (para que las cards muestren "Disponible" de una vez).
-// El detalle completo se carga aparte, bajo demanda, vía /api/detalle cuando el usuario abre el item.
-        // Enriquecer primeros para badge "Disponible"
+        // Enriquecer primeros (incluye fallback a Hackstore si el player es de "lamovie")
         const limiteEnriquecer = Math.min(resultados.length, 8);
         for (let i = 0; i < limiteEnriquecer; i++) {
             try {
                 resultados[i] = await enriquecerItem(resultados[i]);
-                console.log(`[${i + 1}/${limiteEnriquecer}] ${resultados[i].nombre}`);
+                console.log(`[Lamovie ${i + 1}/${limiteEnriquecer}] ${resultados[i].nombre}`);
             } catch (err) {
                 console.error(`Error enriqueciendo ${resultados[i]?.nombre}:`, err.message);
             }
         }
 
-        // Guardar enriquecidos en Supabase (próxima vez = Disponible)
+        // Guardar enriquecidos en Supabase
         const enriquecidos = resultados.filter(r =>
             r && r.link && (
                 r.reproductor ||
@@ -1463,9 +1983,28 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
         
     } catch (err) {
-        console.error("Error en buscar:", err.message);
+        console.error("Error en buscar (Lamovie):", err.message);
     }
-// Solo cachear si NO es una búsqueda
+
+    // 4. CUARTO: Solo si Lamovie no trajo resultados → fallback a Hackstore
+    if (!resultados || resultados.length === 0) {
+        console.log("Lamovie no trajo resultados → buscando en Hackstore...");
+        try {
+            const seccionHack = seccion === "series" ? "series"
+                              : (seccion === "animes" || seccion === "anime") ? "animes"
+                              : "peliculas";
+            resultados = await buscarEnHackstore(termino, seccionHack, limit);
+
+            if (resultados.length > 0) {
+                await guardarEnSupabase(resultados);
+                console.log(`[Hackstore] ${resultados.length} items encontrados y guardados`);
+            }
+        } catch (err) {
+            console.error("Error en buscar (Hackstore):", err.message);
+        }
+    }
+
+    // Solo cachear si NO es una búsqueda
     if (!termino) {
         await setCache(cacheKey, resultados);
     }
@@ -1474,7 +2013,6 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
 
     return resultados;
 }
-
 
 // ======================================================
 // MANEJO DE ERRORES → Telegram
