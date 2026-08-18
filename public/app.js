@@ -485,8 +485,13 @@ async function seleccionar(item) {
 
     // ========== AQUÍ ESTÁ LA CORRECCIÓN ==========
     // Si no tiene embeds o episodios, los pedimos de nuevo al servidor
+
     const necesitaEnriquecer =
         !item.embeds || item.embeds.length === 0 ||
+        (Array.isArray(item.embeds) && item.embeds.every(e => {
+            const u = (e.url || "").toLowerCase();
+            return u.includes("lamovie") || u.includes("hackstore") || u.includes("play.php") || u.includes("sblanh.com");
+        })) ||
         ((item.tipo === "Serie" || item.tipo === "Anime") && (!item.episodios || item.episodios.length === 0));
 
     if (necesitaEnriquecer && (item.postId || item.link)) {
