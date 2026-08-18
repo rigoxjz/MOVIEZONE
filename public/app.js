@@ -349,7 +349,23 @@ function mostrarCatalogo(lista, contenedor) {
         const portada = item.portada || "https://via.placeholder.com/300x450/11131a/ffffff?text=Sin+portada";
         const nombre = item.nombre || "Sin título";
         const tipo = item.tipo || "Película";
-
+        
+        function esEmbedInvalido(url) {
+            if (!url) return true;
+            const u = String(url).toLowerCase();
+    // Bloquea embeds basura
+            if (
+                u.includes("lamovie.org/embed") ||
+                u.includes("lamovie") ||
+                u.includes("sblanh.com/") ||  
+                u.includes("sblanh") ||  
+                u.includes("hackstore") ||
+                u.includes("play.php")
+            ) {
+                return true;
+            }
+            return false;
+        }
 
 
         // Cuando revisas si tiene video disponible:
@@ -726,23 +742,6 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
     downloadsContainer.innerHTML = "";
     player.src = "about:blank";
 
-    
-    function esEmbedInvalido(url) {
-        if (!url) return true;
-        const u = String(url).toLowerCase();
-    // Bloquea embeds basura
-        if (
-            u.includes("lamovie.org/embed") ||
-            u.includes("lamovie") ||
-            u.includes("sblanh.com/") ||  
-            u.includes("sblanh") ||  
-            u.includes("hackstore") ||
-            u.includes("play.php")
-        ) {
-            return true;
-        }
-        return false;
-    }
     
     let embeds = [];
     if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
