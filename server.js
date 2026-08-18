@@ -499,113 +499,70 @@ function extraerDescripcionHackstore(pagina) {
 
 async function extraerReproductorHackstore(url, $pagina) {
     const candidatos = [];
-
     function agregar(urlEncontrada) {
         if (!urlEncontrada) return;
-
-        // Limpiar un poco
-        let limpia = String(urlEncontrada)
-            .replace(/\\u002F/g, "/")
-            .replace(/\\\//g, "/")
-            .replace(/["'<>),]+$/g, "")
-            .trim();
-
-        // Filtros de basura
-        const lower = limpia.toLowerCase();
-        if (
-            lower.includes("fontawesome") ||
-            lower.includes(".css") ||
-            lower.includes(".js") ||
-            lower.includes(".woff") ||
-            lower.includes(".ttf") ||
-            lower.includes(".png") ||
-            lower.includes(".jpg") ||
-            lower.includes(".jpeg") ||
-            lower.includes(".webp") ||
-            lower.includes(".svg") ||
-            lower.includes(".gif") ||
-            lower.includes("google") ||
-            lower.includes("facebook") ||
-            lower.includes("twitter") ||
-            lower.includes("analytics") ||
-            lower.includes("ads") ||
-            lower.length < 15
-        ) {
-            return;
-        }
-
         try {
-            const absoluta = new URL(limpia, url).toString();
-            if (!candidatos.includes(absoluta)) {
-                candidatos.push(absoluta);
-            }
+            const absoluta = new URL(urlEncontrada, url).toString();
+            if (!candidatos.includes(absoluta)) candidatos.push(absoluta);
         } catch {}
     }
 
-    // 1. Iframes (lo más confiable)
     $pagina("iframe").each((_, el) => {
         agregar($pagina(el).attr("src"));
         agregar($pagina(el).attr("data-src"));
         agregar($pagina(el).attr("data-url"));
         agregar($pagina(el).attr("data-embed"));
     });
-
-    // 2. Atributos de reproductores
-    $pagina("[data-player], [data-video], [data-iframe], [data-src]").each((_, el) => {
-        agregar($pagina(el).attr("data-player"));
-        agregar($pagina(el).attr("data-video"));
-        agregar($pagina(el).attr("data-iframe"));
+    $pagina("embed").each((_, el) => agregar($pagina(el).attr("src")));
+    $pagina("video, source").each((_, el) => {
+        agregar($pagina(el).attr("src"));
         agregar($pagina(el).attr("data-src"));
     });
+    $pagina("[data-player], [data-video], [data-iframe]").each((_, el) => {
+        agregar($pagina(el).attr("data-player") || $pagina(el).attr("data-video") || $pagina(el).attr("data-iframe"));
+    });
 
-    // 3. Buscar URLs sospechosas de ser players en el HTML
     const html = $pagina.html() || "";
     const regex = /https?:\/\/[^\s"'<>\\]+/gi;
     const urls = html.match(regex) || [];
-
     for (const encontrada of urls) {
-        agregar(encontrada);
+        let limpia = encontrada.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
+        agregar(limpia);
     }
 
-    // 4. Lista de servidores buenos (prioridad)
-    const buenos = [
-        "vimeos", "player.vimeos",
-        "voe.sx", "voe.",
-        "goodstream",
-        "streamwish",
-        "filemoon",
-        "doodstream", "dood.",
-        "streamtape",
-        "mixdrop",
-        "upstream",
-        "vidmoly",
-        "mp4upload",
-        "ok.ru",
-        "vidhide",
-        "lulustream",
-        "filelions",
-        "vidguard",
-        "supervideo",
-        "pixeldrain",
-        "netu", "hqq", "waaw"
-    ];
+    const prioridad = ["play.php", "/embed/", "/player/", "/embed-", "iframe", ".m3u8", ".mp4"];
+    candidatos.sort((a, b) => {
+        const pa = prioridad.findIndex(x => a.toLowerCase().includes(x));
+        const pb = prioridad.findIndex(x => b.toLowerCase().includes(x));
+        return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
+    });
 
-    // Primero buscar servidores buenos
     for (const candidato of candidatos) {
-        const lower = candidato.toLowerCase();
-        if (buenos.some(b => lower.includes(b))) {
-            return candidato;
-        }
-    }
+        try {
+            if (candidato.includes(".m3u8") || candidato.includes(".mp4")) return candidato;
 
-    // Luego buscar archivos directos de video
-    for (const candidato of candidatos) {
-        if (candidato.includes(".m3u8") || candidato.includes(".mp4")) {
-            return candidato;
-        }
-    }
+            if (candidato.includes("play.php")) {
+                const htmlPlayer = await obtenerHTML(candidato);
+                const match = htmlPlayer.match(/window\.location\.href\s*=\s*["']([^"']+)/i) ||
+                              htmlPlayer.match(/location\.href\s*=\s*["']([^"']+)/i);
+                if (match) {
+                    const siguiente = unirUrl(candidato, match[1]);
+                    if (siguiente) return siguiente;
+                }
+                const urlsPlayer = htmlPlayer.match(regex) || [];
+                for (const urlPlayer of urlsPlayer) {
+                    const limpia = urlPlayer.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
+                    if (limpia.includes(".m3u8") || limpia.includes(".mp4") || limpia.includes("/embed/") || limpia.includes("/player/")) {
+                        return limpia;
+                    }
+                }
+            }
 
-    // Si no hay nada bueno, devolver null (mejor que un player basura)
+            if (candidato.includes("/embed/") || candidato.includes("/player/") || candidato.includes("embed-")) {
+                return candidato;
+            }
+        } catch {}
+    }
     return null;
 }
 
@@ -654,6 +611,7 @@ function extraerEpisodiosHackstore(pagina, paginaBase) {
     });
     return episodios;
 }
+
 
 async function procesarPaginaHackstore(link) {
     const pagina = await obtenerHackstore(link);
