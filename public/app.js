@@ -583,7 +583,7 @@ function detectarNombreServidor(url, fallbackName) {
     const u = String(url).toLowerCase();
 
     // Vimeo → MovieZone (como pediste)
-    if (u.includes("vimeo.com") || u.includes("player.vimeo")) return "MovieZone";
+    if (u.includes("vimeos.net") || u.includes("player.vimeos")) return "MovieZone";
 
     const mapa = [
         ["goodstream", "GoodstreamOne"],
@@ -717,7 +717,16 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
     } else if (fallbackUrl) {
         embeds = [{ url: fallbackUrl, server: "Servidor" }];
     }
-
+// aqui va el short
+    // Vimeo / MovieZone primero
+    embeds.sort((a, b) => {
+        const aV = /vimeos/i.test(a.url  "")  a.server === "MovieZone" || a.name === "MovieZone";
+        const bV = /vimeos/i.test(b.url  "")  b.server === "MovieZone" || b.name === "MovieZone";
+        if (aV && !bV) return -1;
+        if (!aV && bV) return 1;
+        return 0;
+    });
+    
     if (embeds.length > 0) {
         serversSection.style.display = "block";
 
