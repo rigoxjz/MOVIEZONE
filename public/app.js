@@ -361,8 +361,8 @@ function mostrarCatalogo(lista, contenedor) {
                 <span class="type-badge">${escapeHtml(tipo)}</span>
                 ${
                     tieneVideo
-                        ? `<span class="available">Disponible</span>`
-                        : `<span class="unavailable">Sin reproductor</span>`
+                    ? `<span class="available"><span class="dot green"></span> Disponible</span>`
+                    : `<span class="available pending"><span class="dot red"></span> Disponible</span>`
                 }
             </div>
             <div class="movie-info-small">
