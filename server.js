@@ -412,7 +412,7 @@ function detectarServerDesdeUrl(url, fallback) {
     if (!url) return fallback || "Servidor";
     const u = String(url).toLowerCase();
 
-    if (u.includes("vimeo.com") || u.includes("player.vimeo")) return "MovieZone";
+    if (u.includes("vimeos.net") || u.includes("player.vimeos")) return "MovieZone";
 
     const mapa = [
         ["goodstream", "GoodstreamOne"],
@@ -507,6 +507,15 @@ async function getPlayer(postId) {
 
         embeds = embeds.map(normalizarEmbed).filter(Boolean);
         downloads = downloads.map(normalizarDownload).filter(Boolean);
+
+        // Vimeo / MovieZone primero
+        mbeds.sort((a, b) => {
+            const aV = /vimeo/i.test(a.url  "")  a.server === "MovieZone" || a.name === "MovieZone";
+            const bV = /vimeo/i.test(b.url  "")  b.server === "MovieZone" || b.name === "MovieZone";
+            if (aV && !bV) return -1;
+            if (!aV && bV) return 1;
+            return 0;
+        });
 
         let reproductor = null;
         for (const e of embeds) {
