@@ -1978,7 +1978,8 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
     }
 
-    // 1b. Búsqueda local en Supabase (soporta varias palabras)
+    // 1b. Búsqueda local en Supabase (soporta varias palabras
+    /*
     if (termino && moviesDB.length > 0) {
         const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
 
@@ -1993,7 +1994,7 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             await setCache(cacheKey, pagina);
             return pagina;
         }
-    }
+    }*/
 
     // 2. SEGUNDO: Caché temporal (solo si Supabase no tenía datos)
     if (!termino) {
@@ -2079,6 +2080,7 @@ for (const item of resultados) {
     }
 }
 
+    
 // Luego los de Hackstore que no estén ya
 for (const item of resultadosHackstore) {
     const key = normalizarTitulo(item.nombre);
@@ -2088,7 +2090,25 @@ for (const item of resultadosHackstore) {
     }
 }
 
+// Por último, lo que ya teníamos guardado en Supabase para este término,
+// por si las fuentes externas no lo devolvieron esta vez
+if (termino) {
+    const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const enSupabase = moviesDB.filter(item => {
+        const texto = `${item.nombre || ""} ${item.titulo_original || ""}`.toLowerCase();
+        return palabras.every(p => texto.includes(p));
+    });
+    for (const item of enSupabase) {
+        const key = normalizarTitulo(item.nombre);
+        if (key && !vistos.has(key)) {
+            vistos.add(key);
+            resultadosFinales.push(item);
+        }
+    }
+}
+
 resultados = resultadosFinales;
+    
 
 // Guardar todo lo nuevo
 if (resultados.length > 0) {
