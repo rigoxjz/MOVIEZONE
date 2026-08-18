@@ -1367,14 +1367,7 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         cacheKey = `${seccion || "peliculas"}_p${page}_l${limit}`;
     }
 
-    // 1. Cache temporal
-    const cached = await getCache(cacheKey);
-    if (cached) {
-        console.log("Cache hit (tmp):", cacheKey);
-        return cached;
-    }
-
-    // 2. Base de datos Supabase
+    // 1. PRIMERO: Supabase (fuente de verdad)
     if (!termino && moviesDB.length > 0) {
         let filtrados = moviesDB;
 
@@ -1392,17 +1385,20 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
 
         if (pagina.length > 0) {
             console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): página ${page}`);
-            await setCache(cacheKey, pagina);
+            await setCache(cacheKey, pagina); // opcional: actualizar caché
             return pagina;
         }
     }
-        // 2b. Búsqueda local en Supabase (soporta varias palabras)
+
+    // 1b. Búsqueda local en Supabase (soporta varias palabras)
     if (termino && moviesDB.length > 0) {
         const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
+
         const filtrados = moviesDB.filter(item => {
             const texto = `${item.nombre || ""} ${item.titulo_original || ""}`.toLowerCase();
             return palabras.every(p => texto.includes(p));
         });
+
         if (filtrados.length > 0) {
             console.log(`Búsqueda local Supabase: ${filtrados.length} resultados para "${termino}"`);
             const pagina = filtrados.slice(0, limit);
@@ -1411,7 +1407,14 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
     }
 
-    // 3. API nueva
+    // 2. SEGUNDO: Caché temporal (solo si Supabase no tenía datos)
+    const cached = await getCache(cacheKey);
+    if (cached) {
+        console.log("Cache hit (tmp):", cacheKey);
+        return cached;
+    }
+
+    // 3. TERCERO: API externa (aquí sigue tu código actual)
     console.log("Cache miss + Supabase vacío o búsqueda → usando nueva API...");
 
     let resultados = [];
@@ -1686,7 +1689,19 @@ app.get("/api/detalle", async (req, res) => {
 
         // Guardamos la versión completa en Supabase
         await guardarEnSupabase([enriquecido]);
-
+// ↓↓↓ AQUÍ VA EL CÓDIGO ↓↓↓
+        try {
+            const files = await fs.readdir(CACHE_DIR);
+            await Promise.all(
+                files
+                .filter(f => f.startsWith("peliculas_") || f.startsWith("series_") || f.startsWith("animes_"))
+                .map(f => fs.unlink(path.join(CACHE_DIR, f)))
+            );
+            console.log("Cachés de listado invalidadas");
+        } catch (err) {
+    // no pasa nada si falla
+        }
+        
         res.json(enriquecido);
     } catch (error) {
         console.error("Error en /api/detalle:", error.message);
