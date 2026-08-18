@@ -1413,10 +1413,12 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
     }
 
     // 2. SEGUNDO: Caché temporal (solo si Supabase no tenía datos)
-    const cached = await getCache(cacheKey);
-    if (cached) {
-        console.log("Cache hit (tmp):", cacheKey);
-        return cached;
+    if (!termino) {
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            console.log("Cache hit (tmp):", cacheKey);
+            return cached;
+        }
     }
 
     // 3. TERCERO: API externa (aquí sigue tu código actual)
@@ -1463,8 +1465,11 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
     } catch (err) {
         console.error("Error en buscar:", err.message);
     }
+// Solo cachear si NO es una búsqueda
+    if (!termino) {
+        await setCache(cacheKey, resultados);
+    }
 
-    await setCache(cacheKey, resultados);
     await enviarNuevosATelegram(resultados);
 
     return resultados;
