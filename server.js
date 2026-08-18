@@ -509,7 +509,7 @@ async function getPlayer(postId) {
         downloads = downloads.map(normalizarDownload).filter(Boolean);
 
         // Vimeo / MovieZone primero
-        mbeds.sort((a, b) => {
+        embeds.sort((a, b) => {
             const aV = /vimeos/i.test(a.url || "") || a.server === "MovieZone" || a.name === "MovieZone";
             const bV = /vimeos/i.test(b.url || "") || b.server === "MovieZone" || b.name === "MovieZone";
             if (aV && !bV) return -1;
