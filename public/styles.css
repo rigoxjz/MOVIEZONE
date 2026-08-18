@@ -602,3 +602,36 @@ footer {
     border-color: var(--accent);
     color: white;
 }
+
+
+/* ========== BOTÓN DE DISPONIBLE COLORES ========== */
+.available {
+    right: 8px;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.available.pending {
+    color: #ccc;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot.green {
+    background: #22c55e; /* verde */
+}
+
+.dot.red {
+    background: #ef4444; /* rojo */
+}
