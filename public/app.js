@@ -713,10 +713,18 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
     downloadsContainer.innerHTML = "";
     player.src = "about:blank";
 
+    function esEmbedInvalido(url) {
+        if (!url) return true;
+        const u = String(url).toLowerCase();
+    // Bloquea cualquier embed de lamovie.org
+        if (u.includes("lamovie.org/embed")) return true;
+        
+        return false;
+    }
     let embeds = [];
     if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
-        embeds = embedsRaw.filter(e => e && e.url);
-    } else if (fallbackUrl) {
+        embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
+    } else if (fallbackUrl && !esEmbedInvalido(fallbackUrl)) {
         embeds = [{ url: fallbackUrl, server: "Servidor" }];
     }
 // aqui va el short
