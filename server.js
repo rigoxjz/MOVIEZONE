@@ -1999,32 +1999,63 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         console.error("Error en buscar (Lamovie):", err.message);
     }
 
-    // 4. CUARTO: Solo si Lamovie no trajo resultados → fallback a Hackstore
-    if (!resultados || resultados.length === 0) {
-        console.log("Lamovie no trajo resultados → buscando en Hackstore...");
-        try {
-            const seccionHack = seccion === "series" ? "series"
-                              : (seccion === "animes" || seccion === "anime") ? "animes"
-                              : "peliculas";
-            resultados = await buscarEnHackstore(termino, seccionHack, limit);
+   // 4. También buscar en Hackstore (para completar resultados)
+let resultadosHackstore = [];
+try {
+    const seccionHack = seccion === "series" ? "series"
+                      : (seccion === "animes" || seccion === "anime") ? "animes"
+                      : "peliculas";
+    resultadosHackstore = await buscarEnHackstore(termino, seccionHack, limit);
+} catch (err) {
+    console.error("Error en buscar (Hackstore):", err.message);
+}
 
-            if (resultados.length > 0) {
-                await guardarEnSupabase(resultados);
-                console.log(`[Hackstore] ${resultados.length} items encontrados y guardados`);
-            }
-        } catch (err) {
-            console.error("Error en buscar (Hackstore):", err.message);
-        }
+// 5. Combinar resultados evitando duplicados (prioridad a Lamovie)
+function normalizarTitulo(titulo) {
+    return String(titulo || "")
+        .toLowerCase()
+        .replace(/\(.*?\)/g, "")
+        .replace(/[^a-z0-9áéíóúñü\s]/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+const vistos = new Set();
+const resultadosFinales = [];
+
+// Primero los de Lamovie (tienen prioridad)
+for (const item of resultados) {
+    const key = normalizarTitulo(item.nombre);
+    if (key && !vistos.has(key)) {
+        vistos.add(key);
+        resultadosFinales.push(item);
     }
+}
 
-    // Solo cachear si NO es una búsqueda
-    if (!termino) {
-        await setCache(cacheKey, resultados);
+// Luego los de Hackstore que no estén ya
+for (const item of resultadosHackstore) {
+    const key = normalizarTitulo(item.nombre);
+    if (key && !vistos.has(key)) {
+        vistos.add(key);
+        resultadosFinales.push(item);
     }
+}
 
-    await enviarNuevosATelegram(resultados);
+resultados = resultadosFinales;
 
-    return resultados;
+// Guardar todo lo nuevo
+if (resultados.length > 0) {
+    await guardarEnSupabase(resultados);
+}
+
+// Solo cachear si NO es una búsqueda
+if (!termino) {
+    await setCache(cacheKey, resultados);
+}
+
+await enviarNuevosATelegram(resultados);
+
+return resultados;
 }
 
 // ======================================================
