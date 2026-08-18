@@ -351,16 +351,6 @@ function mostrarCatalogo(lista, contenedor) {
         const tipo = item.tipo || "Película";
 
 
-        function esEmbedInvalido(url) {
-            if (!url) return true;
-            const u = String(url).toLowerCase();
-            return (
-                u.includes("lamovie.org/embed") ||
-                u.includes("hackstore") ||          // ← agregar esto
-                u.includes("sblanh.com/") ||  
-                u.includes("play.php")
-            );
-        }
 
         // Cuando revisas si tiene video disponible:
         const embedsValidos = Array.isArray(item.embeds)
