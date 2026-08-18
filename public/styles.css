@@ -635,3 +635,20 @@ footer {
 .dot.red {
     background: #ef4444; /* rojo */
 }
+
+
+/* ========== CENTRA EL TITULO DE RECOMENDADOS ========== */
+
+.nueva-card p.nueva-titulo {
+    font-size: 12px;
+    margin-top: 7px;
+    line-height: 1.3;
+    text-align: center;
+    color: #ccc;
+    
+    /* Permite que el texto se divida en varias líneas */
+    white-space: normal;
+    overflow: visible;
+    height: auto;
+    max-height: 50px; /* opcional: máximo 3-4 líneas */
+}
