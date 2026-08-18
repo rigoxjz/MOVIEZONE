@@ -360,7 +360,6 @@ function mostrarCatalogo(lista, contenedor) {
                 u.includes("sblanh") ||
                 u.includes("4shared") ||
                 u.includes("4shared.com/") ||
-                u.includes("hackstore") ||
                 u.includes("play.php")
             );
         }
@@ -504,15 +503,22 @@ async function seleccionar(item) {
             if (item.postId) params.set("postId", item.postId);
             if (item.link) params.set("link", item.link);
 
-            const res = await fetch(`/api/detalle?${params.toString()}`, { cache: "no-store" });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const res = await fetch(`/api/detalle?${params.toString()}`, {
+                cache: "no-store",
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
             if (res.ok) {
                 const completo = await res.json();
-                // Actualizamos el item actual con los datos completos
                 Object.assign(seleccionActual, completo);
                 item = seleccionActual;
             }
         } catch (err) {
-            console.error("Error enriqueciendo detalle:", err);
+            console.error("Error o timeout enriqueciendo detalle:", err);
         }
     }
 
@@ -750,7 +756,6 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
         u.includes("sblanh") ||
         u.includes("4shared") ||
         u.includes("4shared.com/") ||
-        u.includes("hackstore") ||
         u.includes("play.php")
     );
     }
@@ -834,17 +839,18 @@ function agregarTag(texto, contenedor) {
 // BÚSQUEDA
 // ======================================================
 let temporizadorBusqueda;
-
 searchInput.addEventListener("input", () => {
-    clearTimeout(temporizadorBusqueda);
     const texto = searchInput.value.trim();
-
     if (!texto) {
         mostrarVista(seccionActual === "peliculas" ? "home" : seccionActual);
-        return;
     }
+});
 
-    temporizadorBusqueda = setTimeout(() => buscar(texto), 450);
+searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        const texto = searchInput.value.trim();
+        if (texto) buscar(texto);
+    }
 });
 
 async function buscar(texto) {
