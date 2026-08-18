@@ -409,6 +409,10 @@ function extraerTituloHackstore(pagina, link) {
         nombre = nombre
             .replace(/\s*\|\s*MisVideos.*$/i, "")
             .replace(/\s*-\s*MisVideos.*$/i, "")
+            .replace(/^Descargar\s+(serie|película|pelicula|anime)\s+/i, "")
+            .replace(/^Ver\s+/i, "")
+            .replace(/\s*online\s*$/i, "")
+            .replace(/\s*gratis\s*$/i, "")
             .trim();
     }
     return nombre;
@@ -784,10 +788,18 @@ async function buscarPlayerEnHackstorePorTitulo(nombre) {
             nombreLower.includes((r.nombre || "").toLowerCase())
         );
         if (!mejor) mejor = resultados[0];
-
+        
+        if (mejor) {
+            console.log(`[Hackstore] Título encontrado: ${mejor.nombre}`);
+            console.log(`[Hackstore] Player encontrado: ${mejor.reproductor}`);
+            console.log(`[Hackstore] Embeds:`, mejor.embeds);
+            console.log(`[Hackstore] ¿Es válido?:`, esReproductorValido(mejor.reproductor));
+        }
+        
         if (mejor && esReproductorValido(mejor.reproductor)) {
             return mejor;
         }
+
         if (mejor && Array.isArray(mejor.episodios)) {
             const epConVideo = mejor.episodios.find(e => esReproductorValido(e.video));
             if (epConVideo) return mejor;
