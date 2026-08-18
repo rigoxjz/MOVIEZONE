@@ -287,6 +287,8 @@ function textoSeccion(seccion) {
     return "películas";
 }
 
+
+
 // ======================================================
 // SLIDER NOVEDADES 2026
 // ======================================================
@@ -312,7 +314,7 @@ function llenarSliderNuevas(lista) {
         return `
             <div class="nueva-card" data-id="${escapeAttribute(item.link || "")}">
                 <img src="${escapeAttribute(portada)}" alt="${escapeAttribute(item.nombre || "")}" loading="lazy">
-                <p>${escapeHtml(item.nombre || "Sin título")}</p>
+                <p class="nueva-titulo">${escapeHtml(item.nombre || "Sin título")}</p>
             </div>
         `;
     }).join("");
