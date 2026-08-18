@@ -510,8 +510,8 @@ async function getPlayer(postId) {
 
         // Vimeo / MovieZone primero
         mbeds.sort((a, b) => {
-            const aV = /vimeo/i.test(a.url  "")  a.server === "MovieZone" || a.name === "MovieZone";
-            const bV = /vimeo/i.test(b.url  "")  b.server === "MovieZone" || b.name === "MovieZone";
+            const aV = /vimeos/i.test(a.url  "")  a.server === "MovieZone" || a.name === "MovieZone";
+            const bV = /vimeos/i.test(b.url  "")  b.server === "MovieZone" || b.name === "MovieZone";
             if (aV && !bV) return -1;
             if (!aV && bV) return 1;
             return 0;
