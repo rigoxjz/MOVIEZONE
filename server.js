@@ -499,72 +499,107 @@ function extraerDescripcionHackstore(pagina) {
 
 async function extraerReproductorHackstore(url, $pagina) {
     const candidatos = [];
+
     function agregar(urlEncontrada) {
         if (!urlEncontrada) return;
         try {
             const absoluta = new URL(urlEncontrada, url).toString();
-            if (!candidatos.includes(absoluta)) candidatos.push(absoluta);
+            if (!candidatos.includes(absoluta)) {
+                candidatos.push(absoluta);
+            }
         } catch {}
     }
 
+    // 1. Iframes y atributos comunes
     $pagina("iframe").each((_, el) => {
         agregar($pagina(el).attr("src"));
         agregar($pagina(el).attr("data-src"));
         agregar($pagina(el).attr("data-url"));
         agregar($pagina(el).attr("data-embed"));
     });
+
     $pagina("embed").each((_, el) => agregar($pagina(el).attr("src")));
+
     $pagina("video, source").each((_, el) => {
         agregar($pagina(el).attr("src"));
         agregar($pagina(el).attr("data-src"));
     });
+
     $pagina("[data-player], [data-video], [data-iframe]").each((_, el) => {
         agregar($pagina(el).attr("data-player") || $pagina(el).attr("data-video") || $pagina(el).attr("data-iframe"));
     });
 
+    // 2. Buscar todas las URLs dentro del HTML
     const html = $pagina.html() || "";
     const regex = /https?:\/\/[^\s"'<>\\]+/gi;
     const urls = html.match(regex) || [];
+
     for (const encontrada of urls) {
-        let limpia = encontrada.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
+        let limpia = encontrada
+            .replace(/\\u002F/g, "/")
+            .replace(/\\\//g, "/")
+            .replace(/["'<>),]+$/g, "");
         agregar(limpia);
     }
 
-    const prioridad = ["play.php", "/embed/", "/player/", "/embed-", "iframe", ".m3u8", ".mp4"];
-    candidatos.sort((a, b) => {
-        const pa = prioridad.findIndex(x => a.toLowerCase().includes(x));
-        const pb = prioridad.findIndex(x => b.toLowerCase().includes(x));
-        return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-    });
+    // 3. Filtrar y priorizar reproductores buenos
+    const buenos = [
+        "vimeos", "player.vimeos",
+        "voe", "voe.sx",
+        "goodstream",
+        "streamwish",
+        "filemoon",
+        "doodstream", "dood",
+        "streamtape",
+        "mixdrop",
+        "upstream",
+        "vidmoly",
+        "mp4upload",
+        "ok.ru",
+        "vidhide",
+        "lulustream",
+        "filelions",
+        "vidguard",
+        "supervideo",
+        "pixeldrain"
+    ];
 
+    const malos = [
+        "hackstore",
+        "lamovie",
+        "play.php",
+        "youtube.com",
+        "youtu.be"
+    ];
+
+    // Primero intentamos encontrar un reproductor bueno
     for (const candidato of candidatos) {
-        try {
-            if (candidato.includes(".m3u8") || candidato.includes(".mp4")) return candidato;
+        const lower = candidato.toLowerCase();
 
-            if (candidato.includes("play.php")) {
-                const htmlPlayer = await obtenerHTML(candidato);
-                const match = htmlPlayer.match(/window\.location\.href\s*=\s*["']([^"']+)/i) ||
-                              htmlPlayer.match(/location\.href\s*=\s*["']([^"']+)/i);
-                if (match) {
-                    const siguiente = unirUrl(candidato, match[1]);
-                    if (siguiente) return siguiente;
-                }
-                const urlsPlayer = htmlPlayer.match(regex) || [];
-                for (const urlPlayer of urlsPlayer) {
-                    const limpia = urlPlayer.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
-                    if (limpia.includes(".m3u8") || limpia.includes(".mp4") || limpia.includes("/embed/") || limpia.includes("/player/")) {
-                        return limpia;
-                    }
-                }
-            }
-
-            if (candidato.includes("/embed/") || candidato.includes("/player/") || candidato.includes("embed-")) {
-                return candidato;
-            }
-        } catch {}
+        // Si es un reproductor conocido bueno → lo usamos
+        if (buenos.some(b => lower.includes(b))) {
+            return candidato;
+        }
     }
+
+    // Si no hay buenos, buscamos .m3u8 o .mp4 directos
+    for (const candidato of candidatos) {
+        if (candidato.includes(".m3u8") || candidato.includes(".mp4")) {
+            return candidato;
+        }
+    }
+
+    // Como último recurso, si no es un player malo, lo devolvemos
+    for (const candidato of candidatos) {
+        const lower = candidato.toLowerCase();
+        if (!malos.some(m => lower.includes(m))) {
+            return candidato;
+        }
+    }
+
     return null;
 }
+
 
 function extraerEpisodiosHackstore(pagina, paginaBase) {
     const episodios = [];
