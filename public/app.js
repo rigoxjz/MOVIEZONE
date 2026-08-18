@@ -358,6 +358,8 @@ function mostrarCatalogo(lista, contenedor) {
                 u.includes("lamovie") ||
                 u.includes("sblanh.com/") ||
                 u.includes("sblanh") ||
+                u.includes("4shared") ||
+                u.includes("4shared.com/") ||
                 u.includes("hackstore") ||
                 u.includes("play.php")
             );
@@ -492,7 +494,7 @@ async function seleccionar(item) {
         !item.embeds || item.embeds.length === 0 ||
         (Array.isArray(item.embeds) && item.embeds.every(e => {
             const u = (e.url || "").toLowerCase();
-            return u.includes("lamovie") || u.includes("hackstore") || u.includes("play.php") || u.includes("sblanh.com");
+            return u.includes("lamovie") || u.includes("4shared.com") || u.includes("hackstore") || u.includes("play.php") || u.includes("sblanh.com");
         })) ||
         ((item.tipo === "Serie" || item.tipo === "Anime") && (!item.episodios || item.episodios.length === 0));
 
@@ -746,6 +748,8 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
         u.includes("lamovie") ||
         u.includes("sblanh.com/") ||
         u.includes("sblanh") ||
+        u.includes("4shared") ||
+        u.includes("4shared.com/") ||
         u.includes("hackstore") ||
         u.includes("play.php")
     );
