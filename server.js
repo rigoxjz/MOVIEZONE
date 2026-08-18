@@ -397,7 +397,7 @@ async function listSection(section = "movies", page = 1, perPage = 24) {
 }
 
 async function searchApi(query, perPage = 20) {
-    const q = encodeURIComponent(query);
+    const q = encodeURIComponent(String(query).trim());
     const url = `${API}/search?postType=any&q=${q}&postsPerPage=${perPage}`;
     const data = await apiGet(url);
     let posts = data?.data?.posts || data?.data || [];
@@ -405,14 +405,109 @@ async function searchApi(query, perPage = 20) {
     return posts.map(formatItem);
 }
 
+
+
+
+function detectarServerDesdeUrl(url, fallback) {
+    if (!url) return fallback || "Servidor";
+    const u = String(url).toLowerCase();
+
+    if (u.includes("vimeo.com") || u.includes("player.vimeo")) return "MovieZone";
+
+    const mapa = [
+        ["goodstream", "GoodstreamOne"],
+        ["streamwish", "StreamWish"],
+        ["filemoon", "Filemoon"],
+        ["voe", "Voe"],
+        ["doodstream", "Doodstream"],
+        ["dood", "Doodstream"],
+        ["streamtape", "Streamtape"],
+        ["mixdrop", "Mixdrop"],
+        ["upstream", "Upstream"],
+        ["vidmoly", "Vidmoly"],
+        ["mp4upload", "Mp4Upload"],
+        ["ok.ru", "OK"],
+        ["youtube", "YouTube"],
+        ["youtu.be", "YouTube"],
+        ["mediafire", "Mediafire"],
+        ["mega.nz", "Mega"],
+        ["mega.co", "Mega"],
+        ["drive.google", "Google Drive"],
+        ["pixeldrain", "Pixeldrain"],
+        ["1fichier", "1Fichier"],
+        ["yourupload", "YourUpload"],
+        ["uqload", "Uqload"],
+        ["vidhide", "Vidhide"],
+        ["lulustream", "LuluStream"],
+        ["filelions", "FileLions"],
+        ["vidguard", "Vidguard"],
+        ["netu", "Netu"],
+        ["hqq", "Netu"],
+        ["waaw", "Netu"],
+        ["krakenfiles", "Krakenfiles"],
+        ["supervideo", "SuperVideo"]
+    ];
+
+    for (const [k, n] of mapa) {
+        if (u.includes(k)) return n;
+    }
+
+    if (fallback && !/^online$/i.test(String(fallback)) && !/^servidor/i.test(String(fallback))) {
+        return String(fallback);
+    }
+
+    try {
+        const host = new URL(url).hostname.replace(/^www\./, "").split(".")[0];
+        if (host) return host.charAt(0).toUpperCase() + host.slice(1);
+    } catch {}
+
+    return "Servidor";
+}
+
+function normalizarEmbed(e) {
+    if (!e) return null;
+    const url = e.url || e.link || e.src || null;
+    if (!url) return null;
+    const server = detectarServerDesdeUrl(url, e.server || e.name || e.host || e.provider);
+    return {
+        url,
+        server,
+        name: server,
+        lang: e.lang || e.language || e.idioma || e.audio || null,
+        quality: e.quality || e.calidad || e.resolution || null,
+        size: e.size || null
+    };
+}
+
+function normalizarDownload(d) {
+    if (!d) return null;
+    if (typeof d === "string") {
+        const server = detectarServerDesdeUrl(d, null);
+        return { url: d, server, name: server, lang: null, quality: null, size: null };
+    }
+    const url = d.url || d.link || d.href || null;
+    if (!url) return null;
+    const server = detectarServerDesdeUrl(url, d.server || d.name || d.host || d.provider);
+    return {
+        url,
+        server,
+        name: server,
+        lang: d.lang || d.language || d.idioma || null,
+        quality: d.quality || d.calidad || null,
+        size: d.size || d.filesize || null
+    };
+}
+
 async function getPlayer(postId) {
     try {
         const url = `${API}/player?postId=${postId}&demo=0`;
         const data = await apiGet(url);
-        const embeds = data?.data?.embeds || [];
-        const downloads = data?.data?.downloads || [];
+        let embeds = data?.data?.embeds || [];
+        let downloads = data?.data?.downloads || [];
 
-        // Priorizamos el primer embed bueno
+        embeds = embeds.map(normalizarEmbed).filter(Boolean);
+        downloads = downloads.map(normalizarDownload).filter(Boolean);
+
         let reproductor = null;
         for (const e of embeds) {
             if (e.url && !e.url.includes("youtube.com") && !e.url.includes("youtu.be")) {
@@ -420,7 +515,6 @@ async function getPlayer(postId) {
                 break;
             }
         }
-        // Si solo hay YouTube, lo usamos igual
         if (!reproductor && embeds.length > 0) {
             reproductor = embeds[0].url;
         }
@@ -431,6 +525,10 @@ async function getPlayer(postId) {
         return { reproductor: null, embeds: [], downloads: [] };
     }
 }
+
+
+
+
 
 async function getEpisodes(serieId, season = 1) {
     try {
@@ -1289,6 +1387,20 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             return pagina;
         }
     }
+        // 2b. Búsqueda local en Supabase (soporta varias palabras)
+    if (termino && moviesDB.length > 0) {
+        const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const filtrados = moviesDB.filter(item => {
+            const texto = `${item.nombre || ""} ${item.titulo_original || ""}`.toLowerCase();
+            return palabras.every(p => texto.includes(p));
+        });
+        if (filtrados.length > 0) {
+            console.log(`Búsqueda local Supabase: ${filtrados.length} resultados para "${termino}"`);
+            const pagina = filtrados.slice(0, limit);
+            await setCache(cacheKey, pagina);
+            return pagina;
+        }
+    }
 
     // 3. API nueva
     console.log("Cache miss + Supabase vacío o búsqueda → usando nueva API...");
@@ -1308,7 +1420,8 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         // Enriquecer solo los primeros
         // Enriquecer solo los primeros (para que las cards muestren "Disponible" de una vez).
 // El detalle completo se carga aparte, bajo demanda, vía /api/detalle cuando el usuario abre el item.
-        const limiteEnriquecer = Math.min(resultados.length, 6);
+        // Enriquecer primeros para badge "Disponible"
+        const limiteEnriquecer = Math.min(resultados.length, 8);
         for (let i = 0; i < limiteEnriquecer; i++) {
             try {
                 resultados[i] = await enriquecerItem(resultados[i]);
@@ -1318,6 +1431,18 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             }
         }
 
+        // Guardar enriquecidos en Supabase (próxima vez = Disponible)
+        const enriquecidos = resultados.filter(r =>
+            r && r.link && (
+                r.reproductor ||
+                (Array.isArray(r.embeds) && r.embeds.length > 0) ||
+                (Array.isArray(r.episodios) && r.episodios.length > 0)
+            )
+        );
+        if (enriquecidos.length > 0) {
+            await guardarEnSupabase(enriquecidos);
+        }
+        
     } catch (err) {
         console.error("Error en buscar:", err.message);
     }
