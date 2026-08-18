@@ -486,15 +486,62 @@ function extraerPortadaHackstore(pagina, link) {
 }
 
 function extraerDescripcionHackstore(pagina) {
-    const posibles = [
+    // 1. Primero intentar meta tags
+    const posiblesMeta = [
         pagina('meta[property="og:description"]').attr("content"),
         pagina('meta[name="description"]').attr("content"),
         pagina('meta[name="twitter:description"]').attr("content")
     ];
-    for (const d of posibles) {
-        if (d && d.trim().length > 10) return d.trim().replace(/\s+/g, " ");
+
+    for (const d of posiblesMeta) {
+        if (d && d.trim().length > 40) {
+            return d.trim().replace(/\s+/g, " ");
+        }
     }
-    return "";
+
+    // 2. Buscar en el contenido de la página (sinopsis real)
+    const selectores = [
+        ".description",
+        ".sinopsis",
+        ".synopsis",
+        ".plot",
+        ".entry-content p",
+        ".post-content p",
+        ".content p",
+        "article p",
+        ".movie-description",
+        ".desc",
+        "#description",
+        ".text-content p"
+    ];
+
+    for (const selector of selectores) {
+        const elementos = pagina(selector);
+        if (elementos.length > 0) {
+            let texto = "";
+            elementos.each((_, el) => {
+                const t = pagina(el).text().trim();
+                if (t.length > 30) {
+                    texto += t + " ";
+                }
+            });
+            texto = texto.trim().replace(/\s+/g, " ");
+            if (texto.length > 60) {
+                return texto;
+            }
+        }
+    }
+
+    // 3. Último recurso: el primer párrafo largo que encuentre
+    let mejor = "";
+    pagina("p").each((_, el) => {
+        const t = pagina(el).text().trim().replace(/\s+/g, " ");
+        if (t.length > mejor.length && t.length > 80) {
+            mejor = t;
+        }
+    });
+
+    return mejor || "";
 }
 
 async function extraerReproductorHackstore(url, $pagina) {
