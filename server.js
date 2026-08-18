@@ -502,15 +502,47 @@ async function extraerReproductorHackstore(url, $pagina) {
 
     function agregar(urlEncontrada) {
         if (!urlEncontrada) return;
+
+        // Limpiar un poco
+        let limpia = String(urlEncontrada)
+            .replace(/\\u002F/g, "/")
+            .replace(/\\\//g, "/")
+            .replace(/["'<>),]+$/g, "")
+            .trim();
+
+        // Filtros de basura
+        const lower = limpia.toLowerCase();
+        if (
+            lower.includes("fontawesome") ||
+            lower.includes(".css") ||
+            lower.includes(".js") ||
+            lower.includes(".woff") ||
+            lower.includes(".ttf") ||
+            lower.includes(".png") ||
+            lower.includes(".jpg") ||
+            lower.includes(".jpeg") ||
+            lower.includes(".webp") ||
+            lower.includes(".svg") ||
+            lower.includes(".gif") ||
+            lower.includes("google") ||
+            lower.includes("facebook") ||
+            lower.includes("twitter") ||
+            lower.includes("analytics") ||
+            lower.includes("ads") ||
+            lower.length < 15
+        ) {
+            return;
+        }
+
         try {
-            const absoluta = new URL(urlEncontrada, url).toString();
+            const absoluta = new URL(limpia, url).toString();
             if (!candidatos.includes(absoluta)) {
                 candidatos.push(absoluta);
             }
         } catch {}
     }
 
-    // 1. Iframes y atributos comunes
+    // 1. Iframes (lo más confiable)
     $pagina("iframe").each((_, el) => {
         agregar($pagina(el).attr("src"));
         agregar($pagina(el).attr("data-src"));
@@ -518,38 +550,31 @@ async function extraerReproductorHackstore(url, $pagina) {
         agregar($pagina(el).attr("data-embed"));
     });
 
-    $pagina("embed").each((_, el) => agregar($pagina(el).attr("src")));
-
-    $pagina("video, source").each((_, el) => {
-        agregar($pagina(el).attr("src"));
+    // 2. Atributos de reproductores
+    $pagina("[data-player], [data-video], [data-iframe], [data-src]").each((_, el) => {
+        agregar($pagina(el).attr("data-player"));
+        agregar($pagina(el).attr("data-video"));
+        agregar($pagina(el).attr("data-iframe"));
         agregar($pagina(el).attr("data-src"));
     });
 
-    $pagina("[data-player], [data-video], [data-iframe]").each((_, el) => {
-        agregar($pagina(el).attr("data-player") || $pagina(el).attr("data-video") || $pagina(el).attr("data-iframe"));
-    });
-
-    // 2. Buscar todas las URLs dentro del HTML
+    // 3. Buscar URLs sospechosas de ser players en el HTML
     const html = $pagina.html() || "";
     const regex = /https?:\/\/[^\s"'<>\\]+/gi;
     const urls = html.match(regex) || [];
 
     for (const encontrada of urls) {
-        let limpia = encontrada
-            .replace(/\\u002F/g, "/")
-            .replace(/\\\//g, "/")
-            .replace(/["'<>),]+$/g, "");
-        agregar(limpia);
+        agregar(encontrada);
     }
 
-    // 3. Filtrar y priorizar reproductores buenos
+    // 4. Lista de servidores buenos (prioridad)
     const buenos = [
         "vimeos", "player.vimeos",
-        "voe", "voe.sx",
+        "voe.sx", "voe.",
         "goodstream",
         "streamwish",
         "filemoon",
-        "doodstream", "dood",
+        "doodstream", "dood.",
         "streamtape",
         "mixdrop",
         "upstream",
@@ -561,45 +586,28 @@ async function extraerReproductorHackstore(url, $pagina) {
         "filelions",
         "vidguard",
         "supervideo",
-        "pixeldrain"
+        "pixeldrain",
+        "netu", "hqq", "waaw"
     ];
 
-    const malos = [
-        "hackstore",
-        "lamovie",
-        "play.php",
-        "youtube.com",
-        "youtu.be"
-    ];
-
-    // Primero intentamos encontrar un reproductor bueno
+    // Primero buscar servidores buenos
     for (const candidato of candidatos) {
         const lower = candidato.toLowerCase();
-
-        // Si es un reproductor conocido bueno → lo usamos
         if (buenos.some(b => lower.includes(b))) {
             return candidato;
         }
     }
 
-    // Si no hay buenos, buscamos .m3u8 o .mp4 directos
+    // Luego buscar archivos directos de video
     for (const candidato of candidatos) {
         if (candidato.includes(".m3u8") || candidato.includes(".mp4")) {
             return candidato;
         }
     }
 
-    // Como último recurso, si no es un player malo, lo devolvemos
-    for (const candidato of candidatos) {
-        const lower = candidato.toLowerCase();
-        if (!malos.some(m => lower.includes(m))) {
-            return candidato;
-        }
-    }
-
+    // Si no hay nada bueno, devolver null (mejor que un player basura)
     return null;
 }
-
 
 function extraerEpisodiosHackstore(pagina, paginaBase) {
     const episodios = [];
