@@ -367,6 +367,13 @@ function mostrarCatalogo(lista, contenedor) {
             return false;
         }
 
+        let embeds = [];
+        if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
+            embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
+        } else if (fallbackUrl && !esEmbedInvalido(fallbackUrl)) {
+            embeds = [{ url: fallbackUrl, server: "Servidor" }];
+        }
+
 
         // Cuando revisas si tiene video disponible:
         const embedsValidos = Array.isArray(item.embeds)
@@ -743,12 +750,6 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
     player.src = "about:blank";
 
     
-    let embeds = [];
-    if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
-        embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
-    } else if (fallbackUrl && !esEmbedInvalido(fallbackUrl)) {
-        embeds = [{ url: fallbackUrl, server: "Servidor" }];
-    }
 // aqui va el short
     // Vimeo / MovieZone primero
     embeds.sort((a, b) => {
