@@ -357,7 +357,7 @@ function mostrarCatalogo(lista, contenedor) {
             return (
                 u.includes("lamovie.org/embed") ||
                 u.includes("hackstore") ||          // ← agregar esto
-                u.incudes("sblanh.com/") ||  
+                u.includes("sblanh.com/") ||  
                 u.includes("play.php")
             );
         }
@@ -739,8 +739,8 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
         if (
             u.includes("lamovie.org/embed") ||
             u.includes("lamovie") ||
-            u.incudes("sblanh.com/") ||  
-            u.incudes("sblanh") ||  
+            u.includes("sblanh.com/") ||  
+            u.includes("sblanh") ||  
             u.includes("hackstore") ||
             u.includes("play.php")
         ) {
