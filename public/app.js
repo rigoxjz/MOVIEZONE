@@ -353,25 +353,14 @@ function mostrarCatalogo(lista, contenedor) {
         function esEmbedInvalido(url) {
             if (!url) return true;
             const u = String(url).toLowerCase();
-    // Bloquea embeds basura
-            if (
+            return (
                 u.includes("lamovie.org/embed") ||
                 u.includes("lamovie") ||
-                u.includes("sblanh.com/") ||  
-                u.includes("sblanh") ||  
+                u.includes("sblanh.com/") ||
+                u.includes("sblanh") ||
                 u.includes("hackstore") ||
                 u.includes("play.php")
-            ) {
-                return true;
-            }
-            return false;
-        }
-
-        let embeds = [];
-        if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
-            embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
-        } else if (fallbackUrl && !esEmbedInvalido(fallbackUrl)) {
-            embeds = [{ url: fallbackUrl, server: "Servidor" }];
+            );
         }
 
 
@@ -749,7 +738,26 @@ function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, itemRe
     downloadsContainer.innerHTML = "";
     player.src = "about:blank";
 
+    function esEmbedInvalido(url) {
+    if (!url) return true;
+    const u = String(url).toLowerCase();
+    return (
+        u.includes("lamovie.org/embed") ||
+        u.includes("lamovie") ||
+        u.includes("sblanh.com/") ||
+        u.includes("sblanh") ||
+        u.includes("hackstore") ||
+        u.includes("play.php")
+    );
+    }
     
+    let embeds = [];
+    if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
+        embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
+    } else if (fallbackUrl && !esEmbedInvalido(fallbackUrl)) {
+        embeds = [{ url: fallbackUrl, server: "Servidor" }];
+    }
+
 // aqui va el short
     // Vimeo / MovieZone primero
     embeds.sort((a, b) => {
