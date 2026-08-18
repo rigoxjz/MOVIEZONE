@@ -5,7 +5,12 @@ const path = require("path");
 const fs = require("fs").promises;
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
+
 const app = express();
+
+// Confiar en el proxy de Render
+app.set("trust proxy", 1);
+
 // ======================================================
 // SEGURIDAD (Helmet + Rate Limit)
 // ======================================================
