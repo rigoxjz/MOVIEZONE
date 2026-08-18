@@ -350,11 +350,22 @@ function mostrarCatalogo(lista, contenedor) {
         const nombre = item.nombre || "Sin título";
         const tipo = item.tipo || "Película";
 
+        function esEmbedInvalido(url) {
+            if (!url) return true;
+            const u = String(url).toLowerCase();
+            return u.includes("lamovie.org/embed");
+        }
+
+        const embedsValidos = Array.isArray(item.embeds)
+            ? item.embeds.filter(e => e && e.url && !esEmbedInvalido(e.url))
+            : [];
+
         const tieneVideo =
-            Boolean(item.reproductor) ||
-            (Array.isArray(item.embeds) && item.embeds.length > 0) ||
+            (item.reproductor && !esEmbedInvalido(item.reproductor)) ||
+            embedsValidos.length > 0 ||
             (Array.isArray(item.episodios) && item.episodios.some(e =>
-                e.video || (Array.isArray(e.embeds) && e.embeds.length > 0)
+                (e.video && !esEmbedInvalido(e.video)) ||
+                (Array.isArray(e.embeds) && e.embeds.some(em => em && em.url && !esEmbedInvalido(em.url)))
             ));
 
         card.innerHTML = `
