@@ -1151,17 +1151,22 @@ async function enriquecerItem(item) {
     }
 
     // ======================================================
-    // CASO ESPECIAL: Si el reproductor es de "lamovie" o no válido,
-    // intentamos encontrar uno bueno en Hackstore
+    // FALLBACK A HACKSTORE
+    // Orden correcto: 1º Lamovie → 2º Hackstore (solo si Lamovie no tiene nada válido)
     // ======================================================
-    const playerMalo =
-        !item.reproductor ||
-        esReproductorLamovie(item.reproductor) ||
-        esYouTube(item.reproductor) ||
-        (Array.isArray(item.embeds) && item.embeds.every(e => esReproductorLamovie(e.url) || esYouTube(e.url)));
+
+    // ¿Hay al menos un embed válido de Lamovie?
+    const embedsValidos = Array.isArray(item.embeds)
+        ? item.embeds.filter(e => e && e.url && esReproductorValido(e.url))
+        : [];
+
+    const reproductorValido = item.reproductor && esReproductorValido(item.reproductor);
+
+    // Solo es "malo" si NO hay ningún reproductor ni embed válido
+    const playerMalo = !reproductorValido && embedsValidos.length === 0;
 
     if (playerMalo && item.nombre) {
-        console.log(`[Fallback] Player malo/lamovie detectado en "${item.nombre}". Buscando en Hackstore...`);
+        console.log(`[Fallback] Lamovie no trajo player válido para "${item.nombre}". Buscando en Hackstore...`);
         try {
             const alternativo = await buscarPlayerEnHackstorePorTitulo(item.nombre);
             if (alternativo && esReproductorValido(alternativo.reproductor)) {
@@ -1177,10 +1182,18 @@ async function enriquecerItem(item) {
                     item.episodios = alternativo.episodios;
                 }
                 item.fuente = "hackstore-fallback";
+            } else {
+                console.log(`[Fallback] Hackstore tampoco tiene player válido para "${item.nombre}". Se mantienen datos de Lamovie.`);
             }
         } catch (err) {
             console.error("[Fallback] Error buscando alternativa en Hackstore:", err.message);
         }
+    } else if (embedsValidos.length > 0 || reproductorValido) {
+        // Lamovie ya trajo algo bueno → lo usamos y no tocamos nada
+        if (embedsValidos.length > 0 && !reproductorValido) {
+            item.reproductor = embedsValidos[0].url;
+        }
+        console.log(`[Lamovie] Player válido encontrado para "${item.nombre}" (${embedsValidos.length} embeds).`);
     }
 
     return item;
