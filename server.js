@@ -2202,13 +2202,48 @@ function claveDedup(item) {
     return anio ? `${titulo}|${anio}` : titulo;
 }
 
+function claveTitulo(item) {
+    return normalizarTitulo(item.nombre);
+}
+
+function scoreItem(item) {
+    let s = 0;
+    if (Array.isArray(item.episodios)) s += item.episodios.length * 10;
+    if (item.reproductor && esReproductorValido(item.reproductor)) s += 50;
+    if (Array.isArray(item.embeds)) {
+        s += item.embeds.filter(e => e && e.url && esReproductorValido(e.url)).length * 5;
+    }
+    if (item.calificacion) s += Number(item.calificacion) || 0;
+    if (item.portada) s += 2;
+    if (item.descripcion) s += 1;
+    return s;
+}
+
 const vistos = new Set();
+const vistosTitulo = new Map(); // titulo normalizado → índice en resultadosFinales
 const resultadosFinales = [];
 
 function agregarSinDuplicar(item) {
     const key = claveDedup(item);
-    if (!key || vistos.has(key)) return false;
-    vistos.add(key);
+    const tituloKey = claveTitulo(item);
+    if (!key && !tituloKey) return false;
+
+    // Misma clave exacta titulo|año
+    if (key && vistos.has(key)) return false;
+
+    // Mismo título aunque falte el año → quedarse con el de más score
+    if (tituloKey && vistosTitulo.has(tituloKey)) {
+        const idx = vistosTitulo.get(tituloKey);
+        const actual = resultadosFinales[idx];
+        if (scoreItem(item) > scoreItem(actual)) {
+            resultadosFinales[idx] = item;
+            if (key) vistos.add(key);
+        }
+        return false;
+    }
+
+    if (key) vistos.add(key);
+    if (tituloKey) vistosTitulo.set(tituloKey, resultadosFinales.length);
     resultadosFinales.push(item);
     return true;
 }
