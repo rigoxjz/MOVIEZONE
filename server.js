@@ -1163,6 +1163,28 @@ async function getEpisodes(serieId, season = 1) {
     }
 }
 
+// Construye siempre un link de Lamovie (aunque en DB esté el de Hackstore)
+function linkLamovieDeItem(item) {
+    if (item.link && String(item.link).includes("lamovie")) return item.link;
+    if (item.linkLamovie && String(item.linkLamovie).includes("lamovie")) return item.linkLamovie;
+    const slug = item.slug || null;
+    if (slug) {
+        if (item.tipo === "Anime") return `${BASE}/animes/${slug}/`;
+        if (item.tipo === "Serie") return `${BASE}/series/${slug}/`;
+        return `${BASE}/peliculas/${slug}/`;
+    }
+    if (item.link) {
+        const m = String(item.link).match(/\/(?:animes|series|peliculas|anime|serie)\/([^\/\?]+)/i);
+        if (m) {
+            const s = m[1].replace(/\/$/, "");
+            if (item.tipo === "Anime") return `${BASE}/animes/${s}/`;
+            if (item.tipo === "Serie") return `${BASE}/series/${s}/`;
+            return `${BASE}/peliculas/${s}/`;
+        }
+    }
+    return null;
+}
+
 // Extrae embeds reales scrapeando la página HTML de Lamovie (cuando la API solo da placeholder)
 async function scrapearPlayersDesdePagina(pageUrl) {
     const encontrados = [];
@@ -1249,14 +1271,21 @@ async function enriquecerItem(item) {
         item.downloads = playerData.downloads || [];
         item.embeds = playerData.embeds || [];
 
+        // Link real de Lamovie (nunca scrapear hackstore como si fuera Lamovie)
+        const linkLamovie = linkLamovieDeItem(item);
+        if (linkLamovie && (!item.link || !String(item.link).includes("lamovie"))) {
+            // Preferir link de Lamovie en memoria (sin borrar el original si hacía falta)
+            item.linkLamovie = linkLamovie;
+        }
+
         // Si la API solo dio placeholder, scrapear la página HTML de Lamovie
         const apiSinValidos = !item.reproductor || !esReproductorValido(item.reproductor);
         const embedsApiValidos = Array.isArray(item.embeds)
             ? item.embeds.filter(e => e && e.url && esReproductorValido(e.url))
             : [];
-        if (apiSinValidos && embedsApiValidos.length === 0 && item.link) {
-            console.log(`[Scrape] API sin player válido → scrapeando página: ${item.link}`);
-            const scraped = await scrapearPlayersDesdePagina(item.link);
+        if (apiSinValidos && embedsApiValidos.length === 0 && linkLamovie) {
+            console.log(`[Scrape] API sin player válido → scrapeando página Lamovie: ${linkLamovie}`);
+            const scraped = await scrapearPlayersDesdePagina(linkLamovie);
             if (scraped.length > 0) {
                 item.embeds = scraped;
                 item.reproductor = scraped[0].url;
@@ -1274,36 +1303,36 @@ async function enriquecerItem(item) {
 
         // Si es serie o anime → cargar temporadas y episodios
         if (item.tipo === "Serie" || item.tipo === "Anime") {
-            const epData = await getEpisodes(item.postId, 1);
+            // Primero pedir temporada 1 para saber la lista de temporadas
+            let epData = await getEpisodes(item.postId, 1);
             let seasons = epData.seasons || [];
             if (!seasons.length) seasons = [1];
-            seasons = [...new Set(seasons.map(s => parseInt(s)))].sort((a, b) => a - b);
+            seasons = [...new Set(seasons.map(s => parseInt(s)).filter(n => !isNaN(n)))].sort((a, b) => a - b);
+            // Si la API dice "3" como número de temporadas en vez de array [1,2,3]
+            if (seasons.length === 1 && seasons[0] > 1 && seasons[0] <= 30) {
+                const total = seasons[0];
+                seasons = Array.from({ length: total }, (_, i) => i + 1);
+            }
 
             item.temporadas = seasons;
             item.episodios = [];
 
-            const posts = epData.posts || [];
-            console.log(`[Episodios] ${item.nombre}: ${posts.length} eps en temporada 1, temporadas: ${seasons.join(",")}`);
+            // Recorrer temporadas hasta reunir episodios (máx 40 en total)
+            const MAX_EPS = 40;
+            for (const seasonNum of seasons) {
+                if (item.episodios.length >= MAX_EPS) break;
+                const dataTemp = seasonNum === 1 ? epData : await getEpisodes(item.postId, seasonNum);
+                const posts = dataTemp.posts || [];
+                console.log(`[Episodios] ${item.nombre} T${seasonNum}: ${posts.length} eps`);
 
-            // Limitar a los primeros 30 para no demorar demasiado
-            const limiteEp = Math.min(posts.length, 30);
-            for (let i = 0; i < limiteEp; i++) {
-                const ep = posts[i];
-                let epPlayer = await getPlayer(ep._id);
+                for (const ep of posts) {
+                    if (item.episodios.length >= MAX_EPS) break;
+                    let epPlayer = await getPlayer(ep._id);
 
-                // Si el episodio tampoco tiene player válido, scrapear su link si existe
-                const epSinValido = !epPlayer.reproductor || !esReproductorValido(epPlayer.reproductor);
-                const epEmbedsOk = Array.isArray(epPlayer.embeds) && epPlayer.embeds.some(e => e && e.url && esReproductorValido(e.url));
-                if (epSinValido && !epEmbedsOk) {
-                    const epSlug = ep.slug || ep.link || null;
-                    let epUrl = null;
-                    if (ep.link && String(ep.link).startsWith("http")) epUrl = ep.link;
-                    else if (item.link && epSlug) epUrl = item.link.replace(/\/?$/, "/") + (String(epSlug).includes("/") ? "" : "") ;
-                    // Intentar URL típica de episodio en Lamovie
-                    if (!epUrl && item.link && ep.season_number && ep.episode_number) {
-                        // a veces no hay URL directa; el getPlayer debería bastar
-                    }
-                    if (epUrl) {
+                    const epSinValido = !epPlayer.reproductor || !esReproductorValido(epPlayer.reproductor);
+                    const epEmbedsOk = Array.isArray(epPlayer.embeds) && epPlayer.embeds.some(e => e && e.url && esReproductorValido(e.url));
+                    if (epSinValido && !epEmbedsOk && linkLamovie && ep.slug) {
+                        const epUrl = `${linkLamovie.replace(/\/?$/, "/")}${ep.slug}/`;
                         const scrapedEp = await scrapearPlayersDesdePagina(epUrl);
                         if (scrapedEp.length > 0) {
                             epPlayer = {
@@ -1313,28 +1342,31 @@ async function enriquecerItem(item) {
                             };
                         }
                     }
-                }
 
-                item.episodios.push({
-                    id: ep._id,
-                    nombre: ep.title || `T${ep.season_number}E${String(ep.episode_number).padStart(2, "0")}`,
-                    season: ep.season_number,
-                    episode: ep.episode_number,
-                    video: epPlayer.reproductor || null,
-                    embeds: epPlayer.embeds || [],
-                    downloads: epPlayer.downloads || [],
-                    soloTrailer: epPlayer.reproductor
-                        ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be"))
-                        : false
-                });
+                    item.episodios.push({
+                        id: ep._id,
+                        nombre: ep.title || `T${ep.season_number || seasonNum}E${String(ep.episode_number || item.episodios.length + 1).padStart(2, "0")}`,
+                        season: ep.season_number || seasonNum,
+                        episode: ep.episode_number || null,
+                        video: epPlayer.reproductor || null,
+                        embeds: epPlayer.embeds || [],
+                        downloads: epPlayer.downloads || [],
+                        soloTrailer: epPlayer.reproductor
+                            ? (epPlayer.reproductor.includes("youtube") || epPlayer.reproductor.includes("youtu.be"))
+                            : false
+                    });
+                }
             }
+            console.log(`[Episodios] ${item.nombre}: total ${item.episodios.length} eps cargados, temporadas: ${seasons.join(",")}`);
         }
-    } else if (item.link && String(item.link).includes("lamovie")) {
-        // Sin postId pero con link de Lamovie → scrapear directo
-        const scraped = await scrapearPlayersDesdePagina(item.link);
-        if (scraped.length > 0) {
-            item.embeds = scraped;
-            item.reproductor = scraped[0].url;
+    } else {
+        const linkLamovie = linkLamovieDeItem(item);
+        if (linkLamovie) {
+            const scraped = await scrapearPlayersDesdePagina(linkLamovie);
+            if (scraped.length > 0) {
+                item.embeds = scraped;
+                item.reproductor = scraped[0].url;
+            }
         }
     }
 
