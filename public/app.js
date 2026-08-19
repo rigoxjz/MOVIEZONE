@@ -99,7 +99,9 @@ function esEmbedInvalido(url) {
         u.includes("lamovie") ||
         u.includes("sblanh.com/") ||
         u.includes("sblanh") ||
-        u.includes("4shared") ||
+        u.includes("sblanh.com/") ||
+        u.includes("example") ||   
+        u.includes("example.com") ||
         u.includes("4shared.com/") ||
         u.includes("play.php")
     );
