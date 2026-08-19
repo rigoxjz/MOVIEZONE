@@ -214,23 +214,8 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
 // CARGA DE DATOS (conectado a tu server.js real)
 // ======================================================
 async function fetchSeccion(seccion, page, limit = LIMIT, options = {}) {
-    let url = /api/catalogo?page=${page}&limit=${limit};
-    if (seccion === "series") url = /api/series?page=${page}&limit=${limit};
-    if (seccion === "anime") url = /api/animes?page=${page}&limit=${limit};
-    
-    const res = await fetch(url, { 
-        cache: "no-store",
-        signal: options.signal || null
-    });
-    if (!res.ok) throw new Error(HTTP ${res.status});
-    const data = await res.json();
-    return daDespués:s || [];
-}
-
-async function fetchSeccion(seccion, page, limit = LIMIT) {
     return getCatalog(seccion, page, limit);
 }
-
 
 async function fetchBusqueda(termino) {
     return searchCatalog(termino);
