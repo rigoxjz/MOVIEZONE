@@ -2,6 +2,9 @@
 // MOVIEZONE — app.js (adaptado al template "Cypher")
 // ======================================================
 
+import { initWakeupNotice } from './js/ui/wakeup.js';
+import { getCatalog, searchCatalog } from './js/data/catalog.js';
+
 const LIMIT = 24;
 const PLACEHOLDER = "https://via.placeholder.com/300x450/0a0611/ffffff?text=Sin+portada";
 
@@ -210,15 +213,24 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
 // ======================================================
 // CARGA DE DATOS (conectado a tu server.js real)
 // ======================================================
-async function fetchSeccion(seccion, page, limit = LIMIT) {
-    let url = `/api/catalogo?page=${page}&limit=${limit}`;
-    if (seccion === "series") url = `/api/series?page=${page}&limit=${limit}`;
-    if (seccion === "anime") url = `/api/animes?page=${page}&limit=${limit}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+async function fetchSeccion(seccion, page, limit = LIMIT, options = {}) {
+    let url = /api/catalogo?page=${page}&limit=${limit};
+    if (seccion === "series") url = /api/series?page=${page}&limit=${limit};
+    if (seccion === "anime") url = /api/animes?page=${page}&limit=${limit};
+    
+    const res = await fetch(url, { 
+        cache: "no-store",
+        signal: options.signal || null
+    });
+    if (!res.ok) throw new Error(HTTP ${res.status});
     const data = await res.json();
-    return data.resultados || [];
+    return daDespués:s || [];
 }
+
+async function fetchSeccion(seccion, page, limit = LIMIT) {
+    return getCatalog(seccion, page, limit);
+}
+
 
 async function fetchBusqueda(termino) {
     const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { cache: "no-store" });
@@ -395,14 +407,27 @@ heroInfoBtn.addEventListener("click", () => {
 // ======================================================
 // CARGA INICIAL (home)
 // ======================================================
+js
 async function cargarHome() {
+    console.log('🟢 Iniciando cargarHome()');
     try {
-        const [peliculas, series, anime] = await Promise.all([
+        console.log('🟡 Cargando películas, series y anime...');
+
+        const results = await Promise.allSettled([
             fetchSeccion("movie", 1, 12),
             fetchSeccion("series", 1, 12),
             fetchSeccion("anime", 1, 12)
         ]);
 
+        const peliculas = results[0].status === "fulfilled" ? results[0].value : [];
+        const series    = results[1].status === "fulfilled" ? results[1].value : [];
+        const anime     = results[2].status === "fulfilled" ? results[2].value : [];
+
+        console.log('✅ Datos:', {
+            peliculas: peliculas.length,
+            series: series.length,
+            anime: anime.length
+        });
         renderCarousel("carousel-movies", peliculas);
         renderCarousel("carousel-series", series);
         renderCarousel("carousel-anime", anime);
@@ -412,8 +437,9 @@ async function cargarHome() {
         statusBadge.classList.remove("offline");
         statusBadge.classList.add("online");
         statusBadge.querySelector(".status-text").textContent = "Online";
+        console.log('✅ Home cargado');
     } catch (err) {
-        console.error(err);
+        console.error('❌ Error en cargarHome:', err);
         statusBadge.classList.remove("online");
         statusBadge.classList.add("offline");
         statusBadge.querySelector(".status-text").textContent = "Offline";
@@ -752,4 +778,5 @@ window.addEventListener("scroll", () => {
 // ======================================================
 // INICIO
 // ======================================================
+initWakeupNotice();
 cargarHome();
