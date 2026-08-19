@@ -489,13 +489,22 @@ async function seleccionar(item) {
     // ========== AQUÍ ESTÁ LA CORRECCIÓN ==========
     // Si no tiene embeds o episodios, los pedimos de nuevo al servidor
 
+    // Si ya sabemos que es de Hackstore, no tiene episodios pendientes,
+    // y ya no tiene reproductor, no tiene caso esperar: Hackstore ya dijo que no hay.
+    const yaConfirmadoSinReproductor =
+        item.fuente === "hackstore" &&
+        item.tipo !== "Serie" && item.tipo !== "Anime" &&
+        (!item.embeds || item.embeds.length === 0);
+
     const necesitaEnriquecer =
-        !item.embeds || item.embeds.length === 0 ||
-        (Array.isArray(item.embeds) && item.embeds.every(e => {
-            const u = (e.url || "").toLowerCase();
-            return u.includes("lamovie") || u.includes("4shared.com") || u.includes("hackstore") || u.includes("play.php") || u.includes("sblanh.com");
-        })) ||
-        ((item.tipo === "Serie" || item.tipo === "Anime") && (!item.episodios || item.episodios.length === 0));
+        !yaConfirmadoSinReproductor && (
+            !item.embeds || item.embeds.length === 0 ||
+            (Array.isArray(item.embeds) && item.embeds.every(e => {
+                const u = (e.url || "").toLowerCase();
+                return u.includes("lamovie") || u.includes("4shared.com") || u.includes("play.php") || u.includes("sblanh.com");
+            })) ||
+            ((item.tipo === "Serie" || item.tipo === "Anime") && (!item.episodios || item.episodios.length === 0))
+        );
 
     if (necesitaEnriquecer && (item.postId || item.link)) {
         try {
