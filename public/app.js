@@ -535,9 +535,15 @@ async function seleccionar(item) {
     const esSerieOAnime = item.tipo === "Serie" || item.tipo === "Anime";
 
     if (esSerieOAnime && Array.isArray(item.episodios) && item.episodios.length > 0) {
+        // Limpiamos el "Cargando servidores..." — para series se muestra
+        // el panel de servidores solo al elegir un episodio, no antes.
+        serversSection.style.display = "none";
+        serversContainer.innerHTML = "";
+
         episodesSection.style.display = "block";
 
         const seasonSelect = document.getElementById("season-select");
+        
         if (seasonSelect) {
             const temporadas = item.temporadas && item.temporadas.length ? item.temporadas : [1];
             seasonSelect.innerHTML = temporadas.map(s =>
