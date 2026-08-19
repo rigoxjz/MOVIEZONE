@@ -431,12 +431,17 @@ async function cargarHome() {
     console.log('🟢 Iniciando cargarHome()');
     try {
         console.log('🟡 Haciendo fetch de películas, series y anime...');
-        const [peliculas, series, anime] = await Promise.all([
+        
+        const results = await Promise.allSettled([
             fetchSeccionWithWakeup("movie", 1, 12),
             fetchSeccionWithWakeup("series", 1, 12),
             fetchSeccionWithWakeup("anime", 1, 12)
         ]);
-        
+
+        const peliculas = results[0].status === "fulfilled" ? results[0].value : [];
+        const series    = results[1].status === "fulfilled" ? results[1].value : [];
+        const anime     = results[2].status === "fulfilled" ? results[2].value : [];
+
         console.log('✅ Datos recibidos:', { 
             peliculas: peliculas?.length, 
             series: series?.length, 
