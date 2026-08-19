@@ -294,14 +294,19 @@ function crearMediaCard(item) {
     const portada = item.portada || PLACEHOLDER;
     const nombre = item.nombre || "Sin título";
     const tipo = tipoLabel(item.tipo);
-    const rating = item.calificacion ? Number(item.calificacion).toFixed(1) : null;
+    // Siempre mostrar calificación (0 si no tiene)
+    const rating = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
+    const tieneVideo = itemTieneVideo(item);
 
     card.innerHTML = `
         <div class="poster-wrapper">
             <img class="poster-img" src="${escapeHtml(portada)}" alt="${escapeHtml(nombre)}" loading="lazy">
             <div class="poster-overlay"><ion-icon name="play-circle" class="overlay-icon"></ion-icon></div>
-            ${rating ? `<div class="rating-badge"><ion-icon name="star"></ion-icon> ${escapeHtml(rating)}</div>` : ""}
+            <div class="rating-badge"><ion-icon name="star"></ion-icon> ${escapeHtml(rating)}</div>
             <span class="type-badge">${escapeHtml(tipo)}</span>
+            <span class="availability-badge ${tieneVideo ? "available" : "unavailable"}">
+                <span class="dot"></span> Disponible
+            </span>
         </div>
         <div class="media-info">
             <h3>${escapeHtml(nombre)}</h3>
@@ -340,7 +345,7 @@ function pintarHero(item) {
     if (!item) return;
     heroType.textContent = tipoLabel(item.tipo).toUpperCase() + (item.tipo !== "Serie" && item.tipo !== "Anime" ? " RECOMENDADA" : "");
     heroTitle.textContent = item.nombre || "Sin título";
-    heroRating.textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "N/A";
+    heroRating.textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
     heroYear.textContent = item.year || "-";
     heroSynopsis.textContent = item.descripcion || "";
     if (item.backdrop || item.portada) {
@@ -444,7 +449,7 @@ async function abrirDetalle(item, autoPlay = false) {
     }
 
     document.getElementById("details-year").textContent = item.year || "-";
-    document.getElementById("details-rating").textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "N/A";
+    document.getElementById("details-rating").textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
     document.getElementById("details-synopsis").textContent = item.descripcion || "Sin descripción disponible.";
 
     const generosEl = document.getElementById("details-genres");
