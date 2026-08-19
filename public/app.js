@@ -227,6 +227,19 @@ async function fetchSeccion(seccion, page, limit = LIMIT) {
     return data.resultados || [];
 }
 
+// ⭐ NUEVO: Versión con wakeup (envuelve la función original)
+const fetchSeccionWithWakeup = withWakeupNotice(fetchSeccion);
+
+async function fetchBusqueda(termino) {
+    const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.resultados || [];
+}
+
+// ⭐ NUEVO: Versión con wakeup para búsqueda
+const fetchBusquedaWithWakeup = withWakeupNotice(fetchBusqueda);
+
 async function fetchBusqueda(termino) {
     const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -253,10 +266,12 @@ async function cargarPaginaGrid() {
             lista = obtenerFavoritos();
             gridSinMasResultados = true;
         } else if (gridModo === "search") {
-            lista = gridPage === 1 ? await fetchBusqueda(gridTermino) : [];
+            //lista = gridPage === 1 ? await fetchBusqueda(gridTermino) : [];
+            lista = gridPage === 1 ? await fetchBusquedaWithWakeup(gridTermino) : [];
             gridSinMasResultados = true; // búsqueda no pagina
         } else {
-            lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
+  //          lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
+            lista = await fetchSeccionWithWakeup(gridSeccion, gridPage, LIMIT);
             if (lista.length < LIMIT) gridSinMasResultados = true;
         }
 
@@ -405,9 +420,14 @@ heroInfoBtn.addEventListener("click", () => {
 async function cargarHome() {
     try {
         const [peliculas, series, anime] = await Promise.all([
-            fetchSeccion("movie", 1, 12),
-            fetchSeccion("series", 1, 12),
-            fetchSeccion("anime", 1, 12)
+            //fetchSeccion("movie", 1, 12),
+            //fetchSeccion("series", 1, 12),
+            //fetchSeccion("anime", 1, 12)
+            fetchSeccionWithWakeup("movie", 1, 12),      // ← ✅ CAMBIADO
+            fetchSeccionWithWakeup("series", 1, 12),     // ← ✅ CAMBIADO
+            fetchSeccionWithWakeup("anime", 1, 12)       // ← ✅ CAMBIADO
+
+            
         ]);
 
         renderCarousel("carousel-movies", peliculas);
