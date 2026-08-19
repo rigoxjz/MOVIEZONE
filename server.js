@@ -359,10 +359,28 @@ function esReproductorLamovie(url) {
     return u.includes("lamovie.org") || u.includes("lamovie");
 }
 
+/*
 function esReproductorValido(url) {
     if (!url) return false;
     if (esYouTube(url)) return false;
     if (esReproductorLamovie(url)) return false;
+    return true;
+}
+*/
+function esReproductorValido(url) {
+    if (!url) return false;
+    const u = String(url).toLowerCase();
+
+    if (esYouTube(url)) return false;
+    if (esReproductorLamovie(url)) return false;
+
+    // Rechazar imágenes (pósters, backdrops, etc. que aparecen sueltas en el HTML)
+    if (/\.(jpg|jpeg|png|webp|gif|svg|ico|bmp)(\?|$)/i.test(u)) return false;
+    if (u.includes("image.tmdb.org") || u.includes("themoviedb.org")) return false;
+
+    // Rechazar hojas de estilo, fuentes y scripts que a veces se cuelan también
+    if (/\.(css|woff2?|ttf|eot)(\?|$)/i.test(u)) return false;
+
     return true;
 }
 
@@ -1258,7 +1276,34 @@ function itemTieneContenidoValido(item) {
     return reproductorValido || embedsValidos.length > 0;
 }
 
+// ======================================================
+// LOCK — evita procesar el mismo título dos veces a la vez
+// ======================================================
+const procesosEnCurso = new Map(); // key: link o nombre normalizado -> Promise en curso
+
+function claveDeItem(item) {
+    return item.link || item.nombre || item.postId;
+}
+
 async function enriquecerItem(item) {
+    const clave = claveDeItem(item);
+
+    // Si ya hay un proceso en curso para este mismo título, reutilizamos su resultado
+    // en vez de duplicar el trabajo (scraping + Hackstore + guardado en Supabase).
+    if (clave && procesosEnCurso.has(clave)) {
+        console.log(`[Lock] "${item.nombre || clave}" ya se está procesando, esperando resultado existente...`);
+        return procesosEnCurso.get(clave);
+    }
+
+    const promesa = enriquecerItemInterno(item).finally(() => {
+        if (clave) procesosEnCurso.delete(clave);
+    });
+
+    if (clave) procesosEnCurso.set(clave, promesa);
+    return promesa;
+}
+
+async function enriquecerItemInterno(item) {
     if (!item.postId && !item.fuente) return item;
 
     // Si ya viene de Hackstore, no hace falta enriquecer más
