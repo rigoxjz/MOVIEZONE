@@ -1060,8 +1060,53 @@ async function getPlayer(postId) {
         let embeds = data?.data?.embeds || [];
         let downloads = data?.data?.downloads || [];
 
+        // También revisar otras posibles claves de la API
+        if ((!embeds || embeds.length === 0) && data?.data) {
+            const d = data.data;
+            const extras = [].concat(d.players || [], d.servers || [], d.sources || [], d.links || []);
+            if (extras.length) embeds = extras;
+        }
+
         embeds = embeds.map(normalizarEmbed).filter(Boolean);
         downloads = downloads.map(normalizarDownload).filter(Boolean);
+
+        // Filtrar placeholders de Lamovie y YouTube (no sirven para reproducir)
+        const embedsValidos = embeds.filter(e => e.url && esReproductorValido(e.url));
+        const embedsInvalidos = embeds.filter(e => e.url && !esReproductorValido(e.url));
+
+        // Si solo hay placeholders, intentar extraer iframes reales de la página embed de Lamovie
+        if (embedsValidos.length === 0 && embedsInvalidos.length > 0) {
+            for (const inv of embedsInvalidos.slice(0, 2)) {
+                try {
+                    if (!inv.url || !String(inv.url).includes("lamovie")) continue;
+                    const html = await obtenerHTML(inv.url);
+                    const $ = cheerio.load(html);
+                    $("iframe, embed, video source, video").each((_, el) => {
+                        const src = $(el).attr("src") || $(el).attr("data-src") || $(el).attr("data-url");
+                        if (src && esReproductorValido(src)) {
+                            embedsValidos.push(normalizarEmbed({ url: src, server: "Lamovie-resolved" }));
+                        }
+                    });
+                    // Buscar URLs de servidores conocidos en el HTML
+                    const urls = String(html).match(/https?:\/\/[^\s"'<>\\]+/gi) || [];
+                    for (const u of urls) {
+                        const limpia = u.replace(/\\u002F/g, "/").replace(/\\\//g, "/").replace(/["'<>),]+$/g, "");
+                        if (esReproductorValido(limpia) && !embedsValidos.some(e => e.url === limpia)) {
+                            // Solo dominios de streaming conocidos
+                            const host = limpia.toLowerCase();
+                            if (/vimeos|dood|streamtape|voe|filemoon|mixdrop|streamwish|vidmoly|uqload|goodstream|upstream|mp4upload|vidhide|vidguard/.test(host)) {
+                                embedsValidos.push(normalizarEmbed({ url: limpia }));
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("[getPlayer] Error resolviendo embed Lamovie:", err.message);
+                }
+            }
+        }
+
+        // Usar solo embeds válidos si hay; si no, dejar los originales (para diagnóstico)
+        embeds = embedsValidos.length > 0 ? embedsValidos : embeds.filter(e => e.url && !esYouTube(e.url));
 
         // Vimeo / MovieZone primero
         embeds.sort((a, b) => {
@@ -1074,13 +1119,10 @@ async function getPlayer(postId) {
 
         let reproductor = null;
         for (const e of embeds) {
-            if (e.url && !e.url.includes("youtube.com") && !e.url.includes("youtu.be")) {
+            if (e.url && esReproductorValido(e.url)) {
                 reproductor = e.url;
                 break;
             }
-        }
-        if (!reproductor && embeds.length > 0) {
-            reproductor = embeds[0].url;
         }
 
         return { reproductor, embeds, downloads };
@@ -2115,39 +2157,56 @@ try {
 }
 
 // 5. Combinar resultados evitando duplicados (prioridad a Lamovie)
+// Clave = título normalizado + año (exacta). No mezcla películas distintas.
 function normalizarTitulo(titulo) {
     return String(titulo || "")
         .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .replace(/\(.*?\)/g, "")
-        .replace(/[^a-z0-9áéíóúñü\s]/gi, "")
+        .replace(/\[.*?\]/g, "")
+        .replace(/\b(19|20)\d{2}\b/g, "")
+        .replace(/[:\-–—_|]/g, " ")
+        .replace(/\b(the|el|la|los|las|un|una|a|an)\b/g, " ")
+        .replace(/[^a-z0-9\s]/gi, "")
         .replace(/\s+/g, " ")
         .trim();
+}
+
+function extraerAnio(item) {
+    if (item.year) return String(item.year).substring(0, 4);
+    const m = String(item.nombre || "").match(/\b((?:19|20)\d{2})\b/);
+    return m ? m[1] : "";
+}
+
+function claveDedup(item) {
+    const titulo = normalizarTitulo(item.nombre);
+    if (!titulo) return "";
+    const anio = extraerAnio(item);
+    return anio ? `${titulo}|${anio}` : titulo;
 }
 
 const vistos = new Set();
 const resultadosFinales = [];
 
+function agregarSinDuplicar(item) {
+    const key = claveDedup(item);
+    if (!key || vistos.has(key)) return false;
+    vistos.add(key);
+    resultadosFinales.push(item);
+    return true;
+}
+
 // Primero los de Lamovie (tienen prioridad)
 for (const item of resultados) {
-    const key = normalizarTitulo(item.nombre);
-    if (key && !vistos.has(key)) {
-        vistos.add(key);
-        resultadosFinales.push(item);
-    }
+    agregarSinDuplicar(item);
 }
 
-    
 // Luego los de Hackstore que no estén ya
 for (const item of resultadosHackstore) {
-    const key = normalizarTitulo(item.nombre);
-    if (key && !vistos.has(key)) {
-        vistos.add(key);
-        resultadosFinales.push(item);
-    }
+    agregarSinDuplicar(item);
 }
 
-// Por último, lo que ya teníamos guardado en Supabase para este término,
-// por si las fuentes externas no lo devolvieron esta vez
+// Por último, lo que ya teníamos guardado en Supabase para este término
 if (termino) {
     const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
     const enSupabase = moviesDB.filter(item => {
@@ -2155,11 +2214,7 @@ if (termino) {
         return palabras.every(p => texto.includes(p));
     });
     for (const item of enSupabase) {
-        const key = normalizarTitulo(item.nombre);
-        if (key && !vistos.has(key)) {
-            vistos.add(key);
-            resultadosFinales.push(item);
-        }
+        agregarSinDuplicar(item);
     }
 }
 
