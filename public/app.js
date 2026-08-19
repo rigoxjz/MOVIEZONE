@@ -217,11 +217,19 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
 // ======================================================
 // CARGA DE DATOS (conectado a tu server.js real)
 // ======================================================
-async function fetchSeccion(seccion, page, limit = LIMIT) {
+// ======================================================
+// CARGA DE DATOS (conectado a tu server.js real)
+// ======================================================
+async function fetchSeccion(seccion, page, limit = LIMIT, options = {}) {
     let url = `/api/catalogo?page=${page}&limit=${limit}`;
     if (seccion === "series") url = `/api/series?page=${page}&limit=${limit}`;
     if (seccion === "anime") url = `/api/animes?page=${page}&limit=${limit}`;
-    const res = await fetch(url, { cache: "no-store" });
+    
+    // ⭐ AÑADE EL SIGNAL PARA TIMEOUT
+    const res = await fetch(url, { 
+        cache: "no-store",
+        signal: options.signal || null  // ← NUEVO
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return data.resultados || [];
@@ -230,14 +238,16 @@ async function fetchSeccion(seccion, page, limit = LIMIT) {
 // ⭐ NUEVO: Versión con wakeup (envuelve la función original)
 const fetchSeccionWithWakeup = withWakeupNotice(fetchSeccion);
 
-async function fetchBusqueda(termino) {
-    const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { cache: "no-store" });
+async function fetchBusqueda(termino, options = {}) {
+    const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { 
+        cache: "no-store",
+        signal: options.signal || null  // ← NUEVO
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return data.resultados || [];
 }
 
-// ⭐ NUEVO: Versión con wakeup para búsqueda
 const fetchBusquedaWithWakeup = withWakeupNotice(fetchBusqueda);
 
 async function fetchBusqueda(termino) {
