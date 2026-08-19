@@ -233,10 +233,7 @@ async function fetchSeccion(seccion, page, limit = LIMIT) {
 
 
 async function fetchBusqueda(termino) {
-    const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.resultados || [];
+    return searchCatalog(termino);
 }
 
 async function cargarPaginaGrid() {
