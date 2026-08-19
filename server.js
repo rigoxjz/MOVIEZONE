@@ -155,36 +155,54 @@ async function guardarEnSupabase(items) {
 
     // Guardamos TODO lo enriquecido (no solo los "nuevos")
     // así se actualizan los embeds, episodios, etc.
-    const paraInsertar = items
+    const paraInsertarRaw = items
         .filter(item => item.link)
-        .map(item => ({
-            link: item.link,
-            nombre: item.nombre || null,
-            titulo_original: item.titulo_original || null,
-            portada: item.portada || null,
-            backdrop: item.backdrop || null,
-            descripcion: item.descripcion || null,
-            year: item.year || null,
-            genero: item.genero || null,
-            tipo: item.tipo || "Película",
-            idiomas: item.idiomas || [],
-            calidad: item.calidad || [],
-            paises: item.paises || [],
-            calificacion: item.calificacion || null,
-            calificacion_comunidad: item.calificacion_comunidad || null,
-            votos: item.votos ? Math.trunc(Number(item.votos)) || null : null,
-            fecha_estreno: item.fecha_estreno || null,
-            duracion: item.duracion ? Math.trunc(Number(item.duracion)) || null : null,
-            certificacion: item.certificacion || null,
-            ultimo_episodio: item.ultimo_episodio || null,
-            reproductor: item.reproductor || null,
-            embeds: item.embeds || [],
-            downloads: item.downloads || [],
-            solo_trailer: !!item.soloTrailer,
-            episodios: item.episodios || [],
-            temporadas: item.temporadas || [],
-            postId: item.postId || null
-        }));
+        .map(item => {
+            // Evitar que el nombre de la serie se contamine con " - Temporada X Episodio Y"
+            let nombre = item.nombre || null;
+            if (nombre && (item.tipo === "Serie" || item.tipo === "Anime")) {
+                nombre = nombre
+                    .replace(/\s*[-–—]\s*(Temporada|Season|Episodio|Episode|Capítulo|Capitulo).*$/i, "")
+                    .trim();
+            }
+            return {
+                link: item.link,
+                nombre,
+                titulo_original: item.titulo_original || null,
+                portada: item.portada || null,
+                backdrop: item.backdrop || null,
+                descripcion: item.descripcion || null,
+                year: item.year || null,
+                genero: item.genero || null,
+                tipo: item.tipo || "Película",
+                idiomas: item.idiomas || [],
+                calidad: item.calidad || [],
+                paises: item.paises || [],
+                calificacion: item.calificacion || null,
+                calificacion_comunidad: item.calificacion_comunidad || null,
+                votos: item.votos ? Math.trunc(Number(item.votos)) || null : null,
+                fecha_estreno: item.fecha_estreno || null,
+                duracion: item.duracion ? Math.trunc(Number(item.duracion)) || null : null,
+                certificacion: item.certificacion || null,
+                ultimo_episodio: item.ultimo_episodio || null,
+                reproductor: item.reproductor || null,
+                embeds: item.embeds || [],
+                downloads: item.downloads || [],
+                solo_trailer: !!item.soloTrailer,
+                episodios: item.episodios || [],
+                temporadas: item.temporadas || [],
+                postId: item.postId || null
+            };
+        });
+
+    // Deduplicar por link (Supabase falla si el mismo link aparece 2 veces en un upsert)
+    const vistosLink = new Set();
+    const paraInsertar = [];
+    for (const row of paraInsertarRaw) {
+        if (!row.link || vistosLink.has(row.link)) continue;
+        vistosLink.add(row.link);
+        paraInsertar.push(row);
+    }
 
     if (paraInsertar.length === 0) return;
 
@@ -198,10 +216,9 @@ async function guardarEnSupabase(items) {
         // Actualizamos memoria local
         paraInsertar.forEach(item => {
             knownLinks.add(item.link);
-            // Reemplazamos o agregamos en moviesDB
             const idx = moviesDB.findIndex(m => m.link === item.link);
             if (idx >= 0) {
-                moviesDB[idx] = item;
+                moviesDB[idx] = { ...moviesDB[idx], ...item };
             } else {
                 moviesDB.unshift(item);
             }
