@@ -428,17 +428,20 @@ heroInfoBtn.addEventListener("click", () => {
 // CARGA INICIAL (home)
 // ======================================================
 async function cargarHome() {
+    console.log('🟢 Iniciando cargarHome()');
     try {
+        console.log('🟡 Haciendo fetch de películas, series y anime...');
         const [peliculas, series, anime] = await Promise.all([
-            //fetchSeccion("movie", 1, 12),
-            //fetchSeccion("series", 1, 12),
-            //fetchSeccion("anime", 1, 12)
-            fetchSeccionWithWakeup("movie", 1, 12),      // ← ✅ CAMBIADO
-            fetchSeccionWithWakeup("series", 1, 12),     // ← ✅ CAMBIADO
-            fetchSeccionWithWakeup("anime", 1, 12)       // ← ✅ CAMBIADO
-
-            
+            fetchSeccionWithWakeup("movie", 1, 12),
+            fetchSeccionWithWakeup("series", 1, 12),
+            fetchSeccionWithWakeup("anime", 1, 12)
         ]);
+        
+        console.log('✅ Datos recibidos:', { 
+            peliculas: peliculas?.length, 
+            series: series?.length, 
+            anime: anime?.length 
+        });
 
         renderCarousel("carousel-movies", peliculas);
         renderCarousel("carousel-series", series);
@@ -449,8 +452,9 @@ async function cargarHome() {
         statusBadge.classList.remove("offline");
         statusBadge.classList.add("online");
         statusBadge.querySelector(".status-text").textContent = "Online";
+        console.log('✅ Home cargado correctamente');
     } catch (err) {
-        console.error(err);
+        console.error('❌ Error en cargarHome:', err);
         statusBadge.classList.remove("online");
         statusBadge.classList.add("offline");
         statusBadge.querySelector(".status-text").textContent = "Offline";
