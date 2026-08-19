@@ -106,6 +106,10 @@ const GITHUB_DATA_URL = process.env.GITHUB_DATA_URL || "";
 let moviesDB = [];
 let knownLinks = new Set();
 
+// Series/Anime ya refrescados en ESTA sesión del servidor.
+// Se vacía cuando Render se duerme y vuelve a arrancar.
+const refreshedThisSession = new Set();
+
 async function cargarDatosSupabase() {
     try {
         const { data, error } = await supabase
@@ -1100,6 +1104,31 @@ async function getEpisodes(serieId, season = 1) {
     }
 }
 
+// ======================================================
+// ¿El item ya tiene contenido válido guardado?
+// ======================================================
+function itemTieneContenidoValido(item) {
+    if (!item) return false;
+
+    const embedsValidos = Array.isArray(item.embeds)
+        ? item.embeds.filter(e => e && e.url && esReproductorValido(e.url))
+        : [];
+    const reproductorValido = item.reproductor && esReproductorValido(item.reproductor);
+
+    // Series / Anime: válido si tiene episodios con video
+    if (item.tipo === "Serie" || item.tipo === "Anime") {
+        const episodiosConVideo = Array.isArray(item.episodios) && item.episodios.some(ep => {
+            const videoOk = ep.video && esReproductorValido(ep.video);
+            const embedsOk = Array.isArray(ep.embeds) && ep.embeds.some(e => e && e.url && esReproductorValido(e.url));
+            return videoOk || embedsOk;
+        });
+        return episodiosConVideo || reproductorValido || embedsValidos.length > 0;
+    }
+
+    // Películas: válido si tiene reproductor o embeds
+    return reproductorValido || embedsValidos.length > 0;
+}
+
 async function enriquecerItem(item) {
     if (!item.postId && !item.fuente) return item;
 
@@ -1153,17 +1182,31 @@ async function enriquecerItem(item) {
     // ======================================================
     // FALLBACK A HACKSTORE
     // Orden correcto: 1º Lamovie → 2º Hackstore (solo si Lamovie no tiene nada válido)
+    // Para Series/Anime también se consideran los episodios.
     // ======================================================
 
-    // ¿Hay al menos un embed válido de Lamovie?
+    // Embeds válidos del título principal
     const embedsValidos = Array.isArray(item.embeds)
         ? item.embeds.filter(e => e && e.url && esReproductorValido(e.url))
         : [];
 
     const reproductorValido = item.reproductor && esReproductorValido(item.reproductor);
 
-    // Solo es "malo" si NO hay ningún reproductor ni embed válido
-    const playerMalo = !reproductorValido && embedsValidos.length === 0;
+    // En series/anime: ¿algún episodio tiene player/embeds válidos de Lamovie?
+    let episodiosConVideo = false;
+    if ((item.tipo === "Serie" || item.tipo === "Anime") && Array.isArray(item.episodios)) {
+        episodiosConVideo = item.episodios.some(ep => {
+            const videoOk = ep.video && esReproductorValido(ep.video);
+            const embedsOk = Array.isArray(ep.embeds) && ep.embeds.some(e => e && e.url && esReproductorValido(e.url));
+            return videoOk || embedsOk;
+        });
+    }
+
+    // Log de diagnóstico
+    console.log(`[Diagnóstico] "${item.nombre}" → reproductor: ${item.reproductor ? item.reproductor.substring(0, 80) : "null"} | embeds: ${Array.isArray(item.embeds) ? item.embeds.length : 0} | embedsValidos: ${embedsValidos.length} | episodiosConVideo: ${episodiosConVideo}`);
+
+    // Solo es "malo" si NO hay nada válido ni en el título ni en los episodios
+    const playerMalo = !reproductorValido && embedsValidos.length === 0 && !episodiosConVideo;
 
     if (playerMalo && item.nombre) {
         console.log(`[Fallback] Lamovie no trajo player válido para "${item.nombre}". Buscando en Hackstore...`);
@@ -1188,12 +1231,12 @@ async function enriquecerItem(item) {
         } catch (err) {
             console.error("[Fallback] Error buscando alternativa en Hackstore:", err.message);
         }
-    } else if (embedsValidos.length > 0 || reproductorValido) {
-        // Lamovie ya trajo algo bueno → lo usamos y no tocamos nada
+    } else {
+        // Lamovie ya trajo algo bueno (título o episodios) → lo usamos
         if (embedsValidos.length > 0 && !reproductorValido) {
             item.reproductor = embedsValidos[0].url;
         }
-        console.log(`[Lamovie] Player válido encontrado para "${item.nombre}" (${embedsValidos.length} embeds).`);
+        console.log(`[Lamovie] Contenido válido para "${item.nombre}" (embeds: ${embedsValidos.length}, episodiosConVideo: ${episodiosConVideo}). No se busca en Hackstore.`);
     }
 
     return item;
@@ -2327,6 +2370,7 @@ app.get("/api/detalle", async (req, res) => {
     try {
         const postId = req.query.postId;
         const link = req.query.link;
+        const force = req.query.force === "1" || req.query.force === "true";
 
         if (!postId && !link) {
             return res.status(400).json({ error: "Falta postId o link" });
@@ -2356,24 +2400,65 @@ app.get("/api/detalle", async (req, res) => {
             };
         }
 
-        // Siempre enriquecemos de nuevo (esto arregla el problema)
+        // --------------------------------------------------
+        // CACHÉ INTELIGENTE (por sesión de Render)
+        // - Series/Anime: se refrescan UNA vez por arranque del servidor
+        //   (primera vez que entras tras despertar → refresh; si vuelves a entrar → Supabase)
+        // - Películas: si ya tienen player válido → solo Supabase
+        // - force=1 → forzar re-enriquecimiento
+        // --------------------------------------------------
+        const esSerieOAnime = item.tipo === "Serie" || item.tipo === "Anime";
+        const yaValido = itemTieneContenidoValido(item);
+        const sessionKey = String(item.postId || item.link || item.nombre || "");
+        const yaRefrescadoEstaSesion = sessionKey && refreshedThisSession.has(sessionKey);
+
+        // Película con player válido → caché
+        if (!esSerieOAnime && yaValido && !force) {
+            console.log(`[Cache] Película desde Supabase: "${item.nombre}"`);
+            return res.json(item);
+        }
+
+        // Serie/Anime ya refrescada en esta sesión y con contenido válido → caché
+        if (esSerieOAnime && yaValido && yaRefrescadoEstaSesion && !force) {
+            console.log(`[Cache] Serie/Anime desde Supabase (ya refrescada esta sesión): "${item.nombre}"`);
+            return res.json(item);
+        }
+
+        if (esSerieOAnime && !yaRefrescadoEstaSesion) {
+            console.log(`[Refresh] Primera vez esta sesión → refrescando serie/anime: "${item.nombre}"`);
+        } else if (force) {
+            console.log(`[Force] Re-enriqueciendo forzado: "${item.nombre}"`);
+        } else {
+            console.log(`[Enrich] Sin contenido válido → enriqueciendo: "${item.nombre}"`);
+        }
+
+        // Enriquecer (Lamovie → Hackstore si hace falta)
         const enriquecido = await enriquecerItem({ ...item, postId: item.postId || postId });
 
         // Guardamos la versión completa en Supabase
         await guardarEnSupabase([enriquecido]);
-// ↓↓↓ AQUÍ VA EL CÓDIGO ↓↓↓
+
+        // Marcar como refrescado en esta sesión (series/anime)
+        if (esSerieOAnime && sessionKey) {
+            refreshedThisSession.add(sessionKey);
+            // También por el postId del enriquecido por si cambió
+            if (enriquecido.postId) refreshedThisSession.add(String(enriquecido.postId));
+            if (enriquecido.link) refreshedThisSession.add(String(enriquecido.link));
+        }
+
+        // Invalidar cachés de listado para que el grid se actualice
         try {
             const files = await fs.readdir(CACHE_DIR);
             await Promise.all(
                 files
-                .filter(f => f.startsWith("peliculas_") || f.startsWith("series_") || f.startsWith("animes_"))
-                .map(f => fs.unlink(path.join(CACHE_DIR, f)))
+                    .filter(f => f.startsWith("peliculas_") || f.startsWith("series_") || f.startsWith("animes_"))
+                    .map(f => fs.unlink(path.join(CACHE_DIR, f)))
             );
             console.log("Cachés de listado invalidadas");
         } catch (err) {
-    // no pasa nada si falla
+            // no pasa nada si falla
         }
-        
+
         res.json(enriquecido);
     } catch (error) {
         console.error("Error en /api/detalle:", error.message);
@@ -2465,5 +2550,39 @@ app.listen(
 
         // Aviso de inicio
         await enviarTelegram(`✅ <b>MovieZone iniciado</b>\nPuerto: ${PORT}\nItems conocidos: ${knownLinks.size}`);
+
+        // --------------------------------------------------
+        // Al despertar Render: refrescar items SIN contenido válido
+        // - Películas sin player
+        // - Series/Anime sin episodios/player (detectar temporadas/episodios nuevos)
+        // Máximo 8 en total, en segundo plano.
+        // Los que YA tienen contenido válido no se tocan.
+        // --------------------------------------------------
+        setTimeout(async () => {
+            try {
+                const pendientes = moviesDB
+                    .filter(m => !itemTieneContenidoValido(m))
+                    .slice(0, 8);
+
+                if (pendientes.length === 0) {
+                    console.log("[Startup] No hay items pendientes de player/episodios. Nada que refrescar.");
+                    return;
+                }
+
+                console.log(`[Startup] Refrescando ${pendientes.length} items sin contenido válido (pelis/series/anime)...`);
+                for (const item of pendientes) {
+                    try {
+                        const actualizado = await enriquecerItem({ ...item });
+                        await guardarEnSupabase([actualizado]);
+                        console.log(`[Startup] Actualizado: ${actualizado.nombre} (${actualizado.tipo || "Película"})`);
+                    } catch (err) {
+                        console.error(`[Startup] Error con ${item.nombre}:`, err.message);
+                    }
+                }
+                console.log("[Startup] Refresco de items incompletos terminado.");
+            } catch (err) {
+                console.error("[Startup] Error en refresco:", err.message);
+            }
+        }, 5000); // espera 5s después de arrancar
     }
 );
