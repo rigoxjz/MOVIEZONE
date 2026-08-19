@@ -2,6 +2,13 @@
 // MOVIEZONE — app.js (adaptado al template "Cypher")
 // ======================================================
 
+// ======================================================
+// MOVIEZONE — app.js (adaptado al template "Cypher")
+// ======================================================
+
+// ⭐ NUEVO: Importar el wakeup (al principio del archivo)
+import { withWakeupNotice } from './js/wakeup.js';
+
 const LIMIT = 24;
 const PLACEHOLDER = "https://via.placeholder.com/300x450/0a0611/ffffff?text=Sin+portada";
 
