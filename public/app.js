@@ -389,7 +389,6 @@ heroInfoBtn.addEventListener("click", () => {
 // ======================================================
 // CARGA INICIAL (home)
 // ======================================================
-js
 async function cargarHome() {
     console.log('🟢 Iniciando cargarHome()');
     try {
