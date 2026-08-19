@@ -32,7 +32,6 @@ function show() {
 function hide() {
   if (!banner) return;
 
-Mi Número CFE, [19.08.2026 15:39]
 const visible = Date.now() - shownAt;
   const delay = Math.max(0, 900 - visible);
 
