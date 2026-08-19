@@ -3,7 +3,7 @@
 // ======================================================
 
 import { initWakeupNotice } from './js/ui/wakeup.js';
-import { getCatalog, searchCatalog } from './js/data/catalog.js';
+import { getCatalog, searchCatalog } from './js/data/catalogo.js';
 
 const LIMIT = 24;
 const PLACEHOLDER = "https://via.placeholder.com/300x450/0a0611/ffffff?text=Sin+portada";
