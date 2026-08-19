@@ -2,13 +2,6 @@
 // MOVIEZONE — app.js (adaptado al template "Cypher")
 // ======================================================
 
-
-
-// ⭐ CORREGIDO: Ruta correcta a wakeup.js
-import { withWakeupNotice } from './js/ui/wakeup.js';
-
-// ... el resto de tu código queda EXACTAMENTE IGUAL ...
-
 const LIMIT = 24;
 const PLACEHOLDER = "https://via.placeholder.com/300x450/0a0611/ffffff?text=Sin+portada";
 
@@ -217,38 +210,15 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
 // ======================================================
 // CARGA DE DATOS (conectado a tu server.js real)
 // ======================================================
-// ======================================================
-// CARGA DE DATOS (conectado a tu server.js real)
-// ======================================================
-async function fetchSeccion(seccion, page, limit = LIMIT, options = {}) {
+async function fetchSeccion(seccion, page, limit = LIMIT) {
     let url = `/api/catalogo?page=${page}&limit=${limit}`;
     if (seccion === "series") url = `/api/series?page=${page}&limit=${limit}`;
     if (seccion === "anime") url = `/api/animes?page=${page}&limit=${limit}`;
-    
-    // ⭐ AÑADE EL SIGNAL PARA TIMEOUT
-    const res = await fetch(url, { 
-        cache: "no-store",
-        signal: options.signal || null  // ← NUEVO
-    });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return data.resultados || [];
 }
-
-// ⭐ NUEVO: Versión con wakeup (envuelve la función original)
-const fetchSeccionWithWakeup = withWakeupNotice(fetchSeccion);
-
-async function fetchBusqueda(termino, options = {}) {
-    const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { 
-        cache: "no-store",
-        signal: options.signal || null  // ← NUEVO
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.resultados || [];
-}
-
-const fetchBusquedaWithWakeup = withWakeupNotice(fetchBusqueda);
 
 async function fetchBusqueda(termino) {
     const res = await fetch(`/api/buscar?q=${encodeURIComponent(termino)}`, { cache: "no-store" });
@@ -276,12 +246,10 @@ async function cargarPaginaGrid() {
             lista = obtenerFavoritos();
             gridSinMasResultados = true;
         } else if (gridModo === "search") {
-            //lista = gridPage === 1 ? await fetchBusqueda(gridTermino) : [];
-            lista = gridPage === 1 ? await fetchBusquedaWithWakeup(gridTermino) : [];
+            lista = gridPage === 1 ? await fetchBusqueda(gridTermino) : [];
             gridSinMasResultados = true; // búsqueda no pagina
         } else {
-  //          lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
-            lista = await fetchSeccionWithWakeup(gridSeccion, gridPage, LIMIT);
+            lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
             if (lista.length < LIMIT) gridSinMasResultados = true;
         }
 
@@ -326,19 +294,14 @@ function crearMediaCard(item) {
     const portada = item.portada || PLACEHOLDER;
     const nombre = item.nombre || "Sin título";
     const tipo = tipoLabel(item.tipo);
-    // Siempre mostrar calificación (0 si no tiene)
-    const rating = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
-    const tieneVideo = itemTieneVideo(item);
+    const rating = item.calificacion ? Number(item.calificacion).toFixed(1) : null;
 
     card.innerHTML = `
         <div class="poster-wrapper">
             <img class="poster-img" src="${escapeHtml(portada)}" alt="${escapeHtml(nombre)}" loading="lazy">
             <div class="poster-overlay"><ion-icon name="play-circle" class="overlay-icon"></ion-icon></div>
-            <div class="rating-badge"><ion-icon name="star"></ion-icon> ${escapeHtml(rating)}</div>
+            ${rating ? `<div class="rating-badge"><ion-icon name="star"></ion-icon> ${escapeHtml(rating)}</div>` : ""}
             <span class="type-badge">${escapeHtml(tipo)}</span>
-            <span class="availability-badge ${tieneVideo ? "available" : "unavailable"}">
-                <span class="dot"></span> Disponible
-            </span>
         </div>
         <div class="media-info">
             <h3>${escapeHtml(nombre)}</h3>
@@ -377,7 +340,7 @@ function pintarHero(item) {
     if (!item) return;
     heroType.textContent = tipoLabel(item.tipo).toUpperCase() + (item.tipo !== "Serie" && item.tipo !== "Anime" ? " RECOMENDADA" : "");
     heroTitle.textContent = item.nombre || "Sin título";
-    heroRating.textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
+    heroRating.textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "N/A";
     heroYear.textContent = item.year || "-";
     heroSynopsis.textContent = item.descripcion || "";
     if (item.backdrop || item.portada) {
@@ -428,25 +391,12 @@ heroInfoBtn.addEventListener("click", () => {
 // CARGA INICIAL (home)
 // ======================================================
 async function cargarHome() {
-    console.log('🟢 Iniciando cargarHome()');
     try {
-        console.log('🟡 Haciendo fetch de películas, series y anime...');
-        
-        const results = await Promise.allSettled([
-            fetchSeccionWithWakeup("movie", 1, 12),
-            fetchSeccionWithWakeup("series", 1, 12),
-            fetchSeccionWithWakeup("anime", 1, 12)
+        const [peliculas, series, anime] = await Promise.all([
+            fetchSeccion("movie", 1, 12),
+            fetchSeccion("series", 1, 12),
+            fetchSeccion("anime", 1, 12)
         ]);
-
-        const peliculas = results[0].status === "fulfilled" ? results[0].value : [];
-        const series    = results[1].status === "fulfilled" ? results[1].value : [];
-        const anime     = results[2].status === "fulfilled" ? results[2].value : [];
-
-        console.log('✅ Datos recibidos:', { 
-            peliculas: peliculas?.length, 
-            series: series?.length, 
-            anime: anime?.length 
-        });
 
         renderCarousel("carousel-movies", peliculas);
         renderCarousel("carousel-series", series);
@@ -457,9 +407,8 @@ async function cargarHome() {
         statusBadge.classList.remove("offline");
         statusBadge.classList.add("online");
         statusBadge.querySelector(".status-text").textContent = "Online";
-        console.log('✅ Home cargado correctamente');
     } catch (err) {
-        console.error('❌ Error en cargarHome:', err);
+        console.error(err);
         statusBadge.classList.remove("online");
         statusBadge.classList.add("offline");
         statusBadge.querySelector(".status-text").textContent = "Offline";
@@ -495,7 +444,7 @@ async function abrirDetalle(item, autoPlay = false) {
     }
 
     document.getElementById("details-year").textContent = item.year || "-";
-    document.getElementById("details-rating").textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
+    document.getElementById("details-rating").textContent = item.calificacion ? Number(item.calificacion).toFixed(1) : "N/A";
     document.getElementById("details-synopsis").textContent = item.descripcion || "Sin descripción disponible.";
 
     const generosEl = document.getElementById("details-genres");
