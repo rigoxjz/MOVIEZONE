@@ -2219,11 +2219,11 @@ body {
     }
 }
 
-
+/*Barra de Peliculas*/
 @media (max-width: 768px) {
 
     #grid-view {
-        margin-top: 70px !important;
+        margin-top: 50px !important;
     }
 
 }
