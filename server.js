@@ -2600,36 +2600,37 @@ app.get(
     limiterBusqueda,
     async (req, res) => {
         try {
-            const termino =
-                String(
-                    req.query.q || ""
-                ).trim();
+            const termino = String(
+                req.query.q || ""
+            ).trim();
+
             if (!termino) {
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            "Escribe algo para buscar"
-                    });
-            }
-            const resultados =
-                await buscar(
-                    termino
-                );
-            res.json({
-                resultados
-            });
-        } catch (error) {
-            console.error(error);
-            await enviarTelegram(`⚠️ Error en /api/buscar\n${error.message}`);
-            res
-                .status(500)
-                .json({
-                    error:
-                        "No se pudo realizar la búsqueda",
-                    detalle:
-                        error.message
+                return res.status(400).json({
+                    error: "Escribe algo para buscar"
                 });
+            }
+
+            const data = await buscar(termino);
+
+            // buscar() ya devuelve el formato unificado:
+            // { resultados, total, page, limit }
+            res.json(data);
+
+        } catch (error) {
+
+            console.error(
+                "Error en /api/buscar:",
+                error
+            );
+
+            await enviarTelegram(
+                `⚠️ Error en /api/buscar\n${error.message}`
+            );
+
+            res.status(500).json({
+                error: "No se pudo realizar la búsqueda",
+                detalle: error.message
+            });
         }
     }
 );
