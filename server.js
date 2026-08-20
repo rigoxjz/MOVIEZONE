@@ -2551,16 +2551,21 @@ app.get("/api/catalogo", async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
 
-        const resultados = await buscar("", "peliculas", page, limit);
-        // data puede ser array (viejo) u objeto { resultados, total }
-        //const resultados = Array.isArray(data) ? data : (data.resultados || []);
-        //const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
-        
+        const data = await buscar("", "peliculas", page, limit);
+
+        const resultados = Array.isArray(data)
+            ? data
+            : (data.resultados || []);
+
+        const total = Array.isArray(data)
+            ? resultados.length
+            : (data.total || resultados.length);
+
         res.json({
-            resultados: data.resultados || [],
+            resultados,
             page,
             limit,
-            total: data.total || 0
+            total
         });
         
     } catch (error) {
@@ -2581,13 +2586,21 @@ app.get("/api/series", async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
 
-        const resultados = await buscar("", "series", page, limit);
-        // data puede ser array (viejo) u objeto { resultados, total }
+        const data = await buscar("", "series", page, limit);
+
+        const resultados = Array.isArray(data)
+            ? data
+            : (data.resultados || []);
+
+        const total = Array.isArray(data)
+            ? resultados.length
+            : (data.total || resultados.length);
+
         res.json({
-            resultados: data.resultados || [],
+            resultados,
             page,
             limit,
-            total: data.total || 0
+            total
         });
     } catch (error) {
         console.error(error);
@@ -2607,14 +2620,21 @@ app.get("/api/animes", async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
 
-        const resultados = await buscar("", "animes", page, limit);
-        // data puede ser array (viejo) u objeto { resultados, total }
+        const data = await buscar("", "animes", page, limit);
+
+        const resultados = Array.isArray(data)
+            ? data
+            : (data.resultados || []);
+
+        const total = Array.isArray(data)
+            ? resultados.length
+            : (data.total || resultados.length);
 
         res.json({
-            resultados: data.resultados || [],
+            resultados,
             page,
             limit,
-            total: data.total || 0
+            total
         });
         
     } catch (error) {
