@@ -2553,15 +2553,16 @@ app.get("/api/catalogo", async (req, res) => {
 
         const resultados = await buscar("", "peliculas", page, limit);
         // data puede ser array (viejo) u objeto { resultados, total }
-        const resultados = Array.isArray(data) ? data : (data.resultados || []);
-        const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
+        //const resultados = Array.isArray(data) ? data : (data.resultados || []);
+        //const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
         
         res.json({
-            resultados,
+            resultados: data.resultados || [],
             page,
             limit,
-            total
+            total: data.total || 0
         });
+        
     } catch (error) {
         console.error(error);
         await enviarTelegram(`⚠️ Error en /api/catalogo\n${error.message}`);
@@ -2582,14 +2583,11 @@ app.get("/api/series", async (req, res) => {
 
         const resultados = await buscar("", "series", page, limit);
         // data puede ser array (viejo) u objeto { resultados, total }
-        const resultados = Array.isArray(data) ? data : (data.resultados || []);
-        const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
-        
         res.json({
-            resultados,
+            resultados: data.resultados || [],
             page,
             limit,
-            total
+            total: data.total || 0
         });
     } catch (error) {
         console.error(error);
@@ -2611,15 +2609,14 @@ app.get("/api/animes", async (req, res) => {
 
         const resultados = await buscar("", "animes", page, limit);
         // data puede ser array (viejo) u objeto { resultados, total }
-        const resultados = Array.isArray(data) ? data : (data.resultados || []);
-        const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
-        
+
         res.json({
-            resultados,
+            resultados: data.resultados || [],
             page,
             limit,
-            total
+            total: data.total || 0
         });
+        
     } catch (error) {
         console.error(error);
         await enviarTelegram(`⚠️ Error en /api/animes\n${error.message}`);
