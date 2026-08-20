@@ -1,58 +1,130 @@
 (function () {
+
     "use strict";
 
-    function initMovieZoneMobile() {
+    function iniciar() {
 
-        if (document.getElementById("mz-mobile-bottom-nav")) {
+        if (
+            document.getElementById(
+                "mz-mobile-bottom-nav"
+            )
+        ) {
             return;
         }
 
-        const nav = document.createElement("div");
 
-        nav.id = "mz-mobile-bottom-nav";
+        const nav =
+            document.createElement(
+                "div"
+            );
+
+
+        nav.id =
+            "mz-mobile-bottom-nav";
+
 
         nav.innerHTML = `
-            <button type="button" class="mz-mobile-nav-item active" data-target="home">
-                <ion-icon name="home-outline"></ion-icon>
+
+            <button
+                type="button"
+                class="mz-mobile-nav-item active"
+                data-target="home"
+            >
+                <ion-icon
+                    name="home-outline">
+                </ion-icon>
+
                 <span>Inicio</span>
+
             </button>
 
-            <button type="button" class="mz-mobile-nav-item" data-target="movie">
-                <ion-icon name="film-outline"></ion-icon>
+
+            <button
+                type="button"
+                class="mz-mobile-nav-item"
+                data-target="movie"
+            >
+                <ion-icon
+                    name="film-outline">
+                </ion-icon>
+
                 <span>Películas</span>
+
             </button>
 
-            <button type="button" class="mz-mobile-nav-item" data-target="series">
-                <ion-icon name="tv-outline"></ion-icon>
+
+            <button
+                type="button"
+                class="mz-mobile-nav-item"
+                data-target="series"
+            >
+                <ion-icon
+                    name="tv-outline">
+                </ion-icon>
+
                 <span>Series</span>
+
             </button>
 
-            <button type="button" class="mz-mobile-nav-item" data-target="anime">
-                <ion-icon name="sparkles-outline"></ion-icon>
+
+            <button
+                type="button"
+                class="mz-mobile-nav-item"
+                data-target="anime"
+            >
+                <ion-icon
+                    name="sparkles-outline">
+                </ion-icon>
+
                 <span>Anime</span>
+
             </button>
 
-            <button type="button" class="mz-mobile-nav-item" data-target="favorites">
-                <ion-icon name="heart-outline"></ion-icon>
+
+            <button
+                type="button"
+                class="mz-mobile-nav-item"
+                data-target="favorites"
+            >
+                <ion-icon
+                    name="heart-outline">
+                </ion-icon>
+
                 <span>Favoritos</span>
+
             </button>
+
         `;
 
-        document.body.appendChild(nav);
 
-        const style = document.createElement("style");
+        document.body.appendChild(
+            nav
+        );
+
+
+        const style =
+            document.createElement(
+                "style"
+            );
+
 
         style.textContent = `
+
             #mz-mobile-bottom-nav {
                 display: none;
             }
 
+
             @media (max-width: 768px) {
 
                 #mz-mobile-bottom-nav {
-                    position: fixed;
+
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
+
+                    grid-template-columns:
+                        repeat(5, 1fr);
+
+                    position: fixed;
 
                     left: 0;
                     right: 0;
@@ -60,234 +132,250 @@
 
                     height: 64px;
 
-                    padding-bottom: env(safe-area-inset-bottom);
+                    padding-bottom:
+                        env(safe-area-inset-bottom);
 
-                    background: rgba(8, 6, 12, .97);
+                    background:
+                        rgba(8,8,12,.97);
 
-                    backdrop-filter: blur(18px);
-                    -webkit-backdrop-filter: blur(18px);
+                    backdrop-filter:
+                        blur(18px);
 
-                    border-top: 1px solid rgba(255,255,255,.08);
+                    -webkit-backdrop-filter:
+                        blur(18px);
 
-                    box-shadow: 0 -8px 30px rgba(0,0,0,.4);
+                    border-top:
+                        1px solid
+                        rgba(255,255,255,.08);
+
+                    box-shadow:
+                        0 -8px 30px
+                        rgba(0,0,0,.4);
 
                     z-index: 99999;
+
                 }
 
-                .mz-mobile-nav-item {
-                    border: 0;
-                    background: transparent;
 
-                    color: rgba(255,255,255,.55);
+                .mz-mobile-nav-item {
+
+                    border: none;
+
+                    background:
+                        transparent;
+
+                    color:
+                        rgba(255,255,255,.55);
 
                     display: flex;
-                    flex-direction: column;
+
+                    flex-direction:
+                        column;
+
                     align-items: center;
+
                     justify-content: center;
 
                     gap: 3px;
 
                     font-family: inherit;
+
                     font-size: 10px;
+
                     font-weight: 600;
 
                     cursor: pointer;
+
                 }
+
 
                 .mz-mobile-nav-item ion-icon {
+
                     font-size: 21px;
+
                 }
+
 
                 .mz-mobile-nav-item.active {
+
                     color: #fff;
+
                 }
+
 
                 .mz-mobile-nav-item.active ion-icon {
+
                     color: #e50914;
+
                 }
+
 
                 body {
-                    padding-bottom: 74px !important;
+
+                    padding-bottom:
+                        74px !important;
+
                 }
+
 
                 /*
-                 * Mantener buscador y Online originales
+                 * IMPORTANTE:
+                 * NO escondemos el buscador.
+                 * Se mantiene arriba.
                  */
 
-                .netflix-navbar .search-container {
-                    display: flex !important;
-                }
-
-                .api-status-badge {
-                    display: flex !important;
-                    padding: 5px 8px;
-                    font-size: 10px;
-                    gap: 4px;
-                }
-
-                .search-box-wrapper input {
-                    width: 110px !important;
-                }
-
-                .search-box-wrapper input:focus {
-                    width: 150px !important;
-                }
-
                 .nav-links {
+
                     display: none !important;
+
                 }
+
             }
 
-            @media (max-width: 430px) {
 
-                .api-status-badge .status-text {
-                    display: none;
+            @media (min-width: 769px) {
+
+                #mz-mobile-bottom-nav {
+
+                    display: none !important;
+
                 }
 
-                .api-status-badge {
-                    width: 22px;
-                    height: 22px;
-                    padding: 0;
-                    justify-content: center;
-                    border-radius: 50%;
-                }
-
-                .status-dot {
-                    width: 7px;
-                    height: 7px;
-                }
-
-                .search-box-wrapper input {
-                    width: 90px !important;
-                    font-size: 12px;
-                }
-
-                .search-box-wrapper input:focus {
-                    width: 120px !important;
-                }
             }
+
         `;
 
-        document.head.appendChild(style);
+
+        document.head.appendChild(
+            style
+        );
 
 
-        const home =
-            document.getElementById("nav-link-home");
+        const elementos = {
 
-        const movie =
-            document.querySelector(
-                '#nav-item-movies .filter-tab'
-            );
+            home:
+                document.getElementById(
+                    "nav-link-home"
+                ),
 
-        const series =
-            document.querySelector(
-                '#nav-item-series .filter-tab'
-            );
+            movie:
+                document.querySelector(
+                    "#nav-item-movies .filter-tab"
+                ),
 
-        const anime =
-            document.querySelector(
-                '#nav-item-anime .filter-tab'
-            );
+            series:
+                document.querySelector(
+                    "#nav-item-series .filter-tab"
+                ),
 
-        const favorites =
-            document.getElementById(
-                "nav-link-favoritos"
-            );
+            anime:
+                document.querySelector(
+                    "#nav-item-anime .filter-tab"
+                ),
+
+            favorites:
+                document.getElementById(
+                    "nav-link-favoritos"
+                )
+
+        };
 
 
         function activar(tipo) {
 
-            nav.querySelectorAll(
+            nav
+                .querySelectorAll(
+                    ".mz-mobile-nav-item"
+                )
+                .forEach(
+                    boton => {
+
+                        boton.classList.toggle(
+                            "active",
+                            boton.dataset.target ===
+                                tipo
+                        );
+
+                    }
+                );
+
+        }
+
+
+        nav
+            .querySelectorAll(
                 ".mz-mobile-nav-item"
-            ).forEach(btn => {
+            )
+            .forEach(
+                boton => {
 
-                btn.classList.toggle(
-                    "active",
-                    btn.dataset.target === tipo
-                );
+                    boton.addEventListener(
+                        "click",
+                        function () {
 
-            });
+                            const tipo =
+                                this.dataset.target;
 
-        }
-
-
-        function navegar(elemento, tipo) {
-
-            if (!elemento) {
-                console.warn(
-                    "MovieZone: navegación no encontrada:",
-                    tipo
-                );
-                return;
-            }
-
-            activar(tipo);
-
-            elemento.click();
-
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
-        }
+                            const elemento =
+                                elementos[tipo];
 
 
-        nav.querySelector(
-            '[data-target="home"]'
-        ).addEventListener(
-            "click",
-            () => navegar(home, "home")
-        );
+                            if (!elemento) {
+
+                                console.warn(
+                                    "MovieZone: elemento no encontrado:",
+                                    tipo
+                                );
+
+                                return;
+
+                            }
 
 
-        nav.querySelector(
-            '[data-target="movie"]'
-        ).addEventListener(
-            "click",
-            () => navegar(movie, "movie")
-        );
+                            activar(tipo);
 
 
-        nav.querySelector(
-            '[data-target="series"]'
-        ).addEventListener(
-            "click",
-            () => navegar(series, "series")
-        );
+                            /*
+                             * Ejecutamos el elemento
+                             * original de app.js.
+                             */
+
+                            elemento.click();
 
 
-        nav.querySelector(
-            '[data-target="anime"]'
-        ).addEventListener(
-            "click",
-            () => navegar(anime, "anime")
-        );
+                            window.scrollTo({
+                                top: 0,
+                                behavior:
+                                    "smooth"
+                            });
 
+                        }
+                    );
 
-        nav.querySelector(
-            '[data-target="favorites"]'
-        ).addEventListener(
-            "click",
-            () => navegar(favorites, "favorites")
-        );
+                }
+            );
 
 
         console.log(
-            "MovieZone: menú inferior móvil activo."
+            "MovieZone: menú móvil cargado."
         );
+
     }
 
 
-    if (document.readyState === "loading") {
+    if (
+        document.readyState ===
+        "loading"
+    ) {
 
         document.addEventListener(
             "DOMContentLoaded",
-            initMovieZoneMobile
+            iniciar
         );
 
     } else {
 
-        initMovieZoneMobile();
+        iniciar();
 
     }
 
