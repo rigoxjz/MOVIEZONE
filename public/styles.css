@@ -1938,7 +1938,7 @@ body {
 
     .grid-section {
         margin-top: 0 !important;
-        padding-top: 70px !important;
+        padding-top: 100px !important;
     }
 
     .filter-toolbar {
@@ -2208,4 +2208,13 @@ body {
         height: 7px;
     }
 
+}
+#filter-toolbar {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .grid-section {
+        padding-top: 100px !important;
+    }
 }
