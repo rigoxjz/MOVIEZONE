@@ -715,25 +715,81 @@ async function procesarPaginaHackstore(link) {
 
     const episodios = extraerEpisodiosHackstore(pagina, link);
 
-    let year = null;
     let genero = null;
-    pagina('script[type="application/ld+json"]').each((_, script) => {
-        try {
-            const raw = pagina(script).html();
-            if (!raw) return;
-            const data = JSON.parse(raw);
-            const objetos = Array.isArray(data) ? data : (data && typeof data === "object" ? (data["@graph"] || [data]) : []);
-            for (const obj of objetos) {
-                if (!obj || typeof obj !== "object") continue;
-                if (!year && (obj.dateCreated || obj.datePublished)) {
-                    year = String(obj.dateCreated || obj.datePublished).substring(0, 4);
-                }
-                if (!genero && obj.genre) {
-                    genero = Array.isArray(obj.genre) ? obj.genre.join(", ") : obj.genre;
-                }
-            }
-        } catch {}
-    });
+
+// ======================================================
+// AÑO — PRIORIDAD: TÍTULO
+// ======================================================
+
+    let year = extraerAnioDelTitulo(nombre);
+
+// ======================================================
+// JSON-LD — SOLO COMO RESPALDO
+// ======================================================
+
+   pagina('script[type="application/ld+json"]').each((_, script) => {
+       try {
+           const raw = pagina(script).html();
+           if (!raw) return;
+
+           const data = JSON.parse(raw);
+
+           const objetos =
+               Array.isArray(data)
+                   ? data
+                   : (
+                       data &&
+                       typeof data === "object"
+                           ? (data["@graph"] || [data])
+                           : []
+                   );
+
+           for (const obj of objetos) {
+
+               if (!obj || typeof obj !== "object") {
+                   continue;
+               }
+
+            // Solo utilizar fecha externa si el título NO tenía año
+               if (!year) {
+
+                   const fecha =
+                       obj.datePublished ||
+                       obj.dateCreated ||
+                       obj.releaseDate;
+
+                   if (fecha) {
+
+                       const match =
+                           String(fecha).match(
+                               /\b((?:19|20)\d{2})\b/
+                           );
+
+                       if (match) {
+                           const posibleYear = Number(match[1]);
+
+                           const anioMaximo =
+                               new Date().getFullYear() + 2;
+
+                           if (
+                               posibleYear >= 1900 &&
+                               posibleYear <= anioMaximo
+                           ) {
+                               year = String(posibleYear);
+                           }
+                       }
+                   }
+               }
+
+               if (!genero && obj.genre) {
+                   genero = Array.isArray(obj.genre)
+                       ? obj.genre.join(", ")
+                       : obj.genre;
+               }
+           }
+
+       } catch {}
+   });
 
     let nombreFinal = nombre || "Sin título";
     if (soloTrailer) nombreFinal = `${nombreFinal} (Solo trailer - No disponible)`;
@@ -905,6 +961,33 @@ function resolveIds(ids, mapping) {
     return ids.map(i => mapping[parseInt(i)] || String(i)).filter(Boolean);
 }
 
+function extraerAnioDelTitulo(titulo) {
+    if (!titulo) return null;
+
+    const texto = String(titulo).trim();
+
+    // Prioridad: año entre paréntesis al final del título
+    // Ejemplo: "Brigada 49 (2004)"
+    let match = texto.match(/\((19|20)\d{2}\)\s*$/);
+
+    // Respaldo: cualquier año válido dentro del título
+    if (!match) {
+        match = texto.match(/\b((?:19|20)\d{2})\b/);
+    }
+
+    if (!match) return null;
+
+    const anio = Number(match[0].replace(/[()]/g, ""));
+
+    // Evitar valores que no sean años razonables
+    const anioMaximo = new Date().getFullYear() + 2;
+
+    if (anio < 1900 || anio > anioMaximo) {
+        return null;
+    }
+
+    return String(anio);
+}
 
 function formatItem(p) {
     const images = p.images || {};
@@ -929,12 +1012,22 @@ function formatItem(p) {
         link = `${BASE}/animes/${p.slug}/`;
     }
 
-    const yearArr = resolveIds(p.years, YEARS);
-    const year = yearArr[0] || (p.release_date ? String(p.release_date).substring(0, 4) : null);
+    const nombre = p.title || "Sin título";
 
+    const yearTitulo = extraerAnioDelTitulo(nombre);
+
+    const yearArr = resolveIds(p.years, YEARS);
+
+    const yearFuente =
+        yearArr[0] ||
+        (p.release_date
+            ? String(p.release_date).substring(0, 4)
+            : null);
+    const year = yearTitulo || yearFuente;
+    
     return {
         id: p._id,
-        nombre: p.title || "Sin título",
+        nombre,
         titulo_original: p.original_title || null,
         slug: p.slug,
         tipo,
