@@ -2259,17 +2259,18 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             filtrados = moviesDB.filter(item => item.tipo === "Película" || !item.tipo);
         }
 
-        // Paginación sobre Supabase
+        const totalItems = filtrados.length;
         const inicio = (page - 1) * limit;
         const pagina = filtrados.slice(inicio, inicio + limit);
 
-        if (pagina.length > 0) {
-            console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): página ${page}`);
-            await setCache(cacheKey, pagina); // opcional: actualizar caché
-            return pagina;
+        // Si hay items en esta página → devolverlos (aunque no tengan reproductor todavía)
+        if (pagina.length > 0 || page === 1) {
+            console.log(`Sirviendo desde Supabase (${seccion || "peliculas"}): página ${page} de ${Math.ceil(totalItems / limit) || 1} (${totalItems} total)`);
+    //        await setCache(cacheKey, pagina); // opcional: actualizar caché
+            // Devolvemos también el total para la paginación del frontend
+            return { resultados: pagina, total: totalItems, page, limit };
         }
     }
-
     // 1b. Búsqueda local en Supabase (soporta varias palabras
     /*
     if (termino && moviesDB.length > 0) {
@@ -2451,8 +2452,22 @@ resultados = resultadosFinales;
     
 
 // Guardar todo lo nuevo
+// Guardar TODOS los resultados (aunque no tengan reproductor todavía)
 if (resultados.length > 0) {
     await guardarEnSupabase(resultados);
+}
+
+// Invalidar caches de secciones para que los nuevos aparezcan al instante
+if (termino) {
+    try {
+        const files = await fs.readdir(CACHE_DIR);
+        await Promise.all(
+            files
+                .filter(f => f.startsWith("peliculas_") || f.startsWith("series_") || f.startsWith("animes_") || f.startsWith("peliculas") || f.startsWith("series") || f.startsWith("animes"))
+                .map(f => fs.unlink(path.join(CACHE_DIR, f)).catch(() => {}))
+        );
+        console.log("Caches de secciones invalidados tras búsqueda");
+    } catch (e) {}
 }
 
 // Solo cachear si NO es una búsqueda
@@ -2462,7 +2477,13 @@ if (!termino) {
 
 await enviarNuevosATelegram(resultados);
 
-return resultados;
+// Formato unificado
+return {
+    resultados,
+    total: resultados.length,
+    page: page || 1,
+    limit: limit || 28
+};
 }
 
 // ======================================================
@@ -2531,6 +2552,10 @@ app.get("/api/catalogo", async (req, res) => {
         const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
 
         const resultados = await buscar("", "peliculas", page, limit);
+        // data puede ser array (viejo) u objeto { resultados, total }
+        const resultados = Array.isArray(data) ? data : (data.resultados || []);
+        const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
+        
         res.json({
             resultados,
             page,
@@ -2556,6 +2581,10 @@ app.get("/api/series", async (req, res) => {
         const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
 
         const resultados = await buscar("", "series", page, limit);
+        // data puede ser array (viejo) u objeto { resultados, total }
+        const resultados = Array.isArray(data) ? data : (data.resultados || []);
+        const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
+        
         res.json({
             resultados,
             page,
@@ -2581,6 +2610,10 @@ app.get("/api/animes", async (req, res) => {
         const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 24));
 
         const resultados = await buscar("", "animes", page, limit);
+        // data puede ser array (viejo) u objeto { resultados, total }
+        const resultados = Array.isArray(data) ? data : (data.resultados || []);
+        const total = Array.isArray(data) ? resultados.length : (data.total || resultados.length);
+        
         res.json({
             resultados,
             page,
