@@ -1872,3 +1872,55 @@ body {
     font-size: 11px;
   }
 }
+
+
+/* ======================================================
+   PAGINACIÓN
+   ====================================================== */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin: 40px 0 60px;
+  flex-wrap: wrap;
+}
+
+.pagination-controls.hidden {
+  display: none;
+}
+
+.btn-page {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 10px 22px;
+  border-radius: 30px;
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-page:hover:not(:disabled) {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  transform: translateY(-2px);
+}
+
+.btn-page:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 14px;
+  color: var(--text-muted);
+  min-width: 140px;
+  text-align: center;
+}
+
+.page-info strong {
+  color: var(--text-main);
+}
