@@ -111,6 +111,7 @@ function esEmbedInvalido(url) {
         u.includes("example.com") ||  
         u.includes("voe.sx/") ||
         u.includes("diasfem.com/") ||
+        u.includes("fembed.com") ||
         u.includes("4shared.com/") ||
         u.includes("play.php")
     );
