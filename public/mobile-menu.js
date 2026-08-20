@@ -1,267 +1,386 @@
-/* =========================================================
-   MovieZone - Menú móvil
-   No modifica server.js ni las APIs.
-   Reutiliza los botones existentes de index.html.
-   ========================================================= */
-
 (function () {
     "use strict";
 
-    function iniciarMenuMovil() {
+    function initMovieZoneMobile() {
 
-        // Evitar que se cree dos veces
-        if (document.getElementById("mz-mobile-menu")) {
+        if (document.getElementById("mz-mobile-bottom-nav")) {
             return;
         }
 
-        // Navegación existente
-        const nav = document.querySelector(".nav-links");
+        /*
+         * IMPORTANTE:
+         * app.js ya tiene los listeners de navegación.
+         * Por eso aquí hacemos click directamente sobre
+         * los <a> originales, NO sobre los <li>.
+         */
 
-        if (!nav) {
-            console.warn("MovieZone: .nav-links no encontrado.");
-            return;
-        }
+        const nav = document.createElement("div");
 
-        // Buscar header
-        let header = nav.closest("header");
+        nav.id = "mz-mobile-bottom-nav";
 
-        if (!header) {
-            header = nav.parentElement;
-        }
+        nav.innerHTML = `
+            <div class="mz-mobile-search">
+                <form id="mz-mobile-search-form">
+                    <ion-icon name="search-outline"></ion-icon>
 
-        if (!header) {
-            header = document.body;
-        }
+                    <input
+                        type="text"
+                        id="mz-mobile-search-input"
+                        placeholder="Buscar películas, series o anime..."
+                        autocomplete="off"
+                    >
+
+                    <button type="submit">
+                        Buscar
+                    </button>
+                </form>
+            </div>
+
+            <div class="mz-mobile-navigation">
+
+                <button
+                    type="button"
+                    class="mz-mobile-nav-item active"
+                    data-target="home"
+                >
+                    <ion-icon name="home-outline"></ion-icon>
+                    <span>Inicio</span>
+                </button>
+
+                <button
+                    type="button"
+                    class="mz-mobile-nav-item"
+                    data-target="movies"
+                >
+                    <ion-icon name="film-outline"></ion-icon>
+                    <span>Películas</span>
+                </button>
+
+                <button
+                    type="button"
+                    class="mz-mobile-nav-item"
+                    data-target="series"
+                >
+                    <ion-icon name="tv-outline"></ion-icon>
+                    <span>Series</span>
+                </button>
+
+                <button
+                    type="button"
+                    class="mz-mobile-nav-item"
+                    data-target="anime"
+                >
+                    <ion-icon name="sparkles-outline"></ion-icon>
+                    <span>Anime</span>
+                </button>
+
+                <button
+                    type="button"
+                    class="mz-mobile-nav-item"
+                    data-target="favorites"
+                >
+                    <ion-icon name="heart-outline"></ion-icon>
+                    <span>Favoritos</span>
+                </button>
+
+            </div>
+        `;
+
+        document.body.appendChild(nav);
+
 
         /* =====================================================
-           ESTILOS DEL MENÚ MÓVIL
+           ESTILOS
            ===================================================== */
 
         const style = document.createElement("style");
 
-        style.id = "mz-mobile-menu-style";
+        style.id = "mz-mobile-bottom-style";
 
         style.textContent = `
 
-            /* Barra superior móvil */
-
-            .mz-mobile-bar {
+            #mz-mobile-bottom-nav {
                 display: none;
-                align-items: center;
-                justify-content: space-between;
-                width: 100%;
-                box-sizing: border-box;
-                padding: 10px 14px;
-                background: #0b0b0b;
-                position: relative;
-                z-index: 9998;
             }
 
-            .mz-mobile-logo {
-                font-size: 22px;
-                font-weight: 800;
-                color: #ffffff;
-                white-space: nowrap;
-            }
+            @media (max-width: 768px) {
 
-            .mz-mobile-logo span {
-                color: #e50914;
-            }
+                /*
+                 * Ocultar solamente la navegación superior.
+                 * NO ocultamos el contenido.
+                 */
 
-            .mz-mobile-actions {
-                display: flex;
-                align-items: center;
-                gap: 5px;
-            }
-
-            .mz-mobile-btn {
-                width: 44px;
-                height: 44px;
-                border: none;
-                border-radius: 8px;
-                background: transparent;
-                color: #ffffff;
-                font-size: 25px;
-                cursor: pointer;
-
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .mz-mobile-btn:hover,
-            .mz-mobile-btn:focus {
-                background: #222222;
-                outline: none;
-            }
-
-            /* =================================================
-               CONTENEDOR DEL MENÚ
-               ================================================= */
-
-            #mz-mobile-menu {
-                position: fixed;
-                inset: 0;
-
-                z-index: 99999;
-
-                visibility: hidden;
-                pointer-events: none;
-            }
-
-            #mz-mobile-menu.open {
-                visibility: visible;
-                pointer-events: auto;
-            }
-
-            /* Fondo oscuro */
-
-            .mz-mobile-backdrop {
-                position: absolute;
-                inset: 0;
-
-                background: rgba(0, 0, 0, 0.72);
-
-                opacity: 0;
-
-                transition: opacity 0.2s ease;
-            }
-
-            #mz-mobile-menu.open .mz-mobile-backdrop {
-                opacity: 1;
-            }
-
-            /* =================================================
-               PANEL LATERAL
-               ================================================= */
-
-            .mz-mobile-drawer {
-                position: absolute;
-
-                top: 0;
-                right: 0;
-
-                width: min(85vw, 340px);
-                height: 100%;
-
-                box-sizing: border-box;
-
-                padding: 20px 16px;
-
-                background: #111111;
-
-                box-shadow: -10px 0 35px rgba(0, 0, 0, 0.5);
-
-                overflow-y: auto;
-
-                transform: translateX(100%);
-
-                transition: transform 0.22s ease;
-            }
-
-            #mz-mobile-menu.open .mz-mobile-drawer {
-                transform: translateX(0);
-            }
-
-            /* Cabecera */
-
-            .mz-mobile-drawer-head {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-
-                padding-bottom: 18px;
-                margin-bottom: 12px;
-
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .mz-mobile-title {
-                font-size: 24px;
-                font-weight: 800;
-                color: #ffffff;
-            }
-
-            .mz-mobile-title span {
-                color: #e50914;
-            }
-
-            /* =================================================
-               BOTONES DEL MENÚ
-               ================================================= */
-
-            .mz-mobile-item {
-                width: 100%;
-
-                min-height: 54px;
-
-                display: flex;
-                align-items: center;
-
-                gap: 14px;
-
-                padding: 12px 15px;
-                margin: 5px 0;
-
-                border: none;
-                border-radius: 9px;
-
-                background: transparent;
-
-                color: #eeeeee;
-
-                font-size: 16px;
-                font-weight: 600;
-
-                text-align: left;
-
-                cursor: pointer;
-            }
-
-            .mz-mobile-item:hover,
-            .mz-mobile-item:focus {
-                background: #242424;
-                color: #ffffff;
-                outline: none;
-            }
-
-            .mz-mobile-item:active {
-                transform: scale(0.98);
-            }
-
-            .mz-mobile-item .mz-icon {
-                width: 25px;
-
-                text-align: center;
-
-                font-size: 19px;
-            }
-
-            /* =================================================
-               SOLO TELÉFONOS / TABLETS
-               ================================================= */
-
-            @media (max-width: 992px) {
-
-                .mz-mobile-bar {
-                    display: flex;
-                }
-
-                #mz-mobile-menu {
-                    display: block;
-                }
-
-            }
-
-            /* =================================================
-               ESCRITORIO
-               ================================================= */
-
-            @media (min-width: 993px) {
-
-                .mz-mobile-bar,
-                #mz-mobile-menu {
+                .netflix-navbar .nav-links {
                     display: none !important;
+                }
+
+                /*
+                 * El buscador original desaparece del navbar.
+                 * Usaremos el buscador inferior.
+                 */
+
+                .netflix-navbar .search-container {
+                    display: none !important;
+                }
+
+                /*
+                 * Navbar superior más limpia.
+                 */
+
+                .netflix-navbar {
+                    height: 56px !important;
+                }
+
+                /*
+                 * Barra móvil inferior completa
+                 */
+
+                #mz-mobile-bottom-nav {
+
+                    display: block;
+
+                    position: fixed;
+
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+
+                    z-index: 99999;
+
+                    background:
+                        rgba(10, 8, 15, 0.97);
+
+                    backdrop-filter: blur(18px);
+                    -webkit-backdrop-filter: blur(18px);
+
+                    border-top:
+                        1px solid rgba(255,255,255,.10);
+
+                    box-shadow:
+                        0 -8px 30px rgba(0,0,0,.35);
+
+                    padding-bottom:
+                        env(safe-area-inset-bottom);
+
+                }
+
+                /*
+                 * Buscador
+                 */
+
+                .mz-mobile-search {
+
+                    padding:
+                        8px 10px 6px;
+
+                }
+
+                #mz-mobile-search-form {
+
+                    height: 42px;
+
+                    display: flex;
+                    align-items: center;
+
+                    background:
+                        rgba(255,255,255,.08);
+
+                    border:
+                        1px solid rgba(255,255,255,.10);
+
+                    border-radius: 12px;
+
+                    overflow: hidden;
+
+                }
+
+                #mz-mobile-search-form ion-icon {
+
+                    margin-left: 12px;
+
+                    font-size: 18px;
+
+                    color: #aaa;
+
+                    flex-shrink: 0;
+
+                }
+
+                #mz-mobile-search-input {
+
+                    flex: 1;
+
+                    min-width: 0;
+
+                    height: 100%;
+
+                    border: none;
+
+                    outline: none;
+
+                    background: transparent;
+
+                    color: white;
+
+                    font-size: 13px;
+
+                    padding:
+                        0 10px;
+
+                }
+
+                #mz-mobile-search-input::placeholder {
+
+                    color:
+                        rgba(255,255,255,.48);
+
+                }
+
+                #mz-mobile-search-form button {
+
+                    height: 34px;
+
+                    margin-right: 4px;
+
+                    padding:
+                        0 13px;
+
+                    border: none;
+
+                    border-radius: 9px;
+
+                    background:
+                        #e50914;
+
+                    color: white;
+
+                    font-size: 12px;
+
+                    font-weight: 700;
+
+                    cursor: pointer;
+
+                }
+
+                /*
+                 * Navegación inferior
+                 */
+
+                .mz-mobile-navigation {
+
+                    height: 58px;
+
+                    display: grid;
+
+                    grid-template-columns:
+                        repeat(5, 1fr);
+
+                    align-items: center;
+
+                }
+
+                .mz-mobile-nav-item {
+
+                    height: 58px;
+
+                    display: flex;
+
+                    flex-direction: column;
+
+                    align-items: center;
+
+                    justify-content: center;
+
+                    gap: 3px;
+
+                    border: none;
+
+                    background: transparent;
+
+                    color:
+                        rgba(255,255,255,.55);
+
+                    font-size: 10px;
+
+                    font-weight: 600;
+
+                    cursor: pointer;
+
+                    -webkit-tap-highlight-color:
+                        transparent;
+
+                }
+
+                .mz-mobile-nav-item ion-icon {
+
+                    font-size: 20px;
+
+                }
+
+                .mz-mobile-nav-item.active {
+
+                    color: #ffffff;
+
+                }
+
+                .mz-mobile-nav-item.active ion-icon {
+
+                    color: #e50914;
+
+                }
+
+                /*
+                 * Espacio inferior para que la barra no tape
+                 * las últimas tarjetas.
+                 */
+
+                body {
+
+                    padding-bottom:
+                        120px !important;
+
+                }
+
+                /*
+                 * El grid no debe quedar debajo de la barra.
+                 */
+
+                #grid-view {
+
+                    padding-bottom:
+                        30px;
+
+                }
+
+            }
+
+            @media (max-width: 380px) {
+
+                #mz-mobile-search-input {
+
+                    font-size: 12px;
+
+                }
+
+                #mz-mobile-search-form button {
+
+                    padding:
+                        0 10px;
+
+                    font-size: 11px;
+
+                }
+
+                .mz-mobile-nav-item {
+
+                    font-size: 9px;
+
+                }
+
+                .mz-mobile-nav-item ion-icon {
+
+                    font-size: 19px;
+
                 }
 
             }
@@ -272,362 +391,282 @@
 
 
         /* =====================================================
-           CREAR BARRA SUPERIOR
+           ELEMENTOS ORIGINALES
            ===================================================== */
 
-        const mobileBar = document.createElement("div");
+        const home =
+            document.getElementById(
+                "nav-link-home"
+            );
 
-        mobileBar.className = "mz-mobile-bar";
+        const movies =
+            document.querySelector(
+                '#nav-item-movies .filter-tab'
+            );
 
-        mobileBar.innerHTML = `
+        const series =
+            document.querySelector(
+                '#nav-item-series .filter-tab'
+            );
 
-            <div class="mz-mobile-logo">
-                Movie<span>Zone</span>
-            </div>
+        const anime =
+            document.querySelector(
+                '#nav-item-anime .filter-tab'
+            );
 
-            <div class="mz-mobile-actions">
-
-                <button
-                    type="button"
-                    class="mz-mobile-btn"
-                    id="mz-mobile-search"
-                    aria-label="Buscar"
-                >
-                    🔍
-                </button>
-
-                <button
-                    type="button"
-                    class="mz-mobile-btn"
-                    id="mz-mobile-open"
-                    aria-label="Abrir menú"
-                >
-                    ☰
-                </button>
-
-            </div>
-
-        `;
-
-        header.insertBefore(mobileBar, header.firstChild);
+        const favorites =
+            document.getElementById(
+                "nav-link-favoritos"
+            );
 
 
-        /* =====================================================
-           CREAR MENÚ LATERAL
-           ===================================================== */
+        /*
+         * Cambia visualmente el botón activo.
+         */
 
-        const menu = document.createElement("div");
+        function activar(tipo) {
 
-        menu.id = "mz-mobile-menu";
+            document
+                .querySelectorAll(
+                    ".mz-mobile-nav-item"
+                )
+                .forEach(function (item) {
 
-        menu.innerHTML = `
+                    item.classList.remove(
+                        "active"
+                    );
 
-            <div class="mz-mobile-backdrop"></div>
+                });
 
-            <aside
-                class="mz-mobile-drawer"
-                role="dialog"
-                aria-label="Menú MovieZone"
-            >
+            const seleccionado =
+                document.querySelector(
+                    '.mz-mobile-nav-item[data-target="' +
+                    tipo +
+                    '"]'
+                );
 
-                <div class="mz-mobile-drawer-head">
+            if (seleccionado) {
 
-                    <div class="mz-mobile-title">
-                        Movie<span>Zone</span>
-                    </div>
+                seleccionado.classList.add(
+                    "active"
+                );
 
-                    <button
-                        type="button"
-                        class="mz-mobile-btn"
-                        id="mz-mobile-close"
-                        aria-label="Cerrar menú"
-                    >
-                        ✕
-                    </button>
+            }
 
-                </div>
-
-
-                <button
-                    type="button"
-                    class="mz-mobile-item"
-                    data-target="#nav-item-home"
-                >
-                    <span class="mz-icon">🏠</span>
-                    <span>Inicio</span>
-                </button>
-
-
-                <button
-                    type="button"
-                    class="mz-mobile-item"
-                    data-target="#nav-item-movies"
-                >
-                    <span class="mz-icon">🎬</span>
-                    <span>Películas</span>
-                </button>
-
-
-                <button
-                    type="button"
-                    class="mz-mobile-item"
-                    data-target="#nav-item-series"
-                >
-                    <span class="mz-icon">📺</span>
-                    <span>Series</span>
-                </button>
-
-
-                <button
-                    type="button"
-                    class="mz-mobile-item"
-                    data-target="#nav-item-anime"
-                >
-                    <span class="mz-icon">✦</span>
-                    <span>Anime</span>
-                </button>
-
-
-                <button
-                    type="button"
-                    class="mz-mobile-item"
-                    data-target="#nav-item-favoritos"
-                >
-                    <span class="mz-icon">❤️</span>
-                    <span>Favoritos</span>
-                </button>
-
-
-                <button
-                    type="button"
-                    class="mz-mobile-item"
-                    id="mz-mobile-search-item"
-                >
-                    <span class="mz-icon">🔍</span>
-                    <span>Buscar</span>
-                </button>
-
-            </aside>
-
-        `;
-
-        document.body.appendChild(menu);
-
-
-        /* =====================================================
-           FUNCIONES
-           ===================================================== */
-
-        function abrirMenu() {
-
-            menu.classList.add("open");
-
-            document.body.style.overflow = "hidden";
         }
 
 
-        function cerrarMenu() {
+        /*
+         * Ejecutar navegación ORIGINAL
+         */
 
-            menu.classList.remove("open");
-
-            document.body.style.overflow = "";
-        }
-
-
-        function ejecutarNavegacion(selector) {
-
-            const elemento = document.querySelector(selector);
+        function navegar(elemento, tipo) {
 
             if (!elemento) {
 
                 console.warn(
-                    "MovieZone: no se encontró:",
-                    selector
+                    "MovieZone móvil: elemento no encontrado:",
+                    tipo
                 );
 
-                return false;
+                return;
+
             }
+
+            activar(tipo);
+
+            /*
+             * Aquí sí hacemos click sobre el <a>
+             * que app.js ya controla.
+             */
 
             elemento.click();
 
-            return true;
         }
 
 
         /* =====================================================
-           BUSCADOR
+           BOTONES
            ===================================================== */
 
-        function abrirBuscador() {
-
-            cerrarMenu();
-
-            const input = document.querySelector(
-                "#search-input, " +
-                "input[name='search'], " +
-                ".search-form input, " +
-                ".search-input"
-            );
-
-
-            if (input) {
-
-                input.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center"
-                });
-
-                setTimeout(function () {
-
-                    input.focus();
-
-                }, 250);
-
-                return;
-            }
-
-
-            const form = document.querySelector(
-                "#search-form, " +
-                ".search-form, " +
-                "form.search-form"
-            );
-
-
-            if (form) {
-
-                form.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center"
-                });
-
-            }
-
-        }
-
-
-        /* =====================================================
-           EVENTOS
-           ===================================================== */
-
-        const openButton =
-            document.getElementById("mz-mobile-open");
-
-        const closeButton =
-            document.getElementById("mz-mobile-close");
-
-        const searchButton =
-            document.getElementById("mz-mobile-search");
-
-        const searchMenuButton =
-            document.getElementById("mz-mobile-search-item");
-
-        const backdrop =
-            menu.querySelector(".mz-mobile-backdrop");
-
-
-        if (openButton) {
-
-            openButton.addEventListener(
-                "click",
-                abrirMenu
-            );
-
-        }
-
-
-        if (closeButton) {
-
-            closeButton.addEventListener(
-                "click",
-                cerrarMenu
-            );
-
-        }
-
-
-        if (backdrop) {
-
-            backdrop.addEventListener(
-                "click",
-                cerrarMenu
-            );
-
-        }
-
-
-        if (searchButton) {
-
-            searchButton.addEventListener(
-                "click",
-                abrirBuscador
-            );
-
-        }
-
-
-        if (searchMenuButton) {
-
-            searchMenuButton.addEventListener(
-                "click",
-                abrirBuscador
-            );
-
-        }
-
-
-        /* =====================================================
-           NAVEGACIÓN DEL MENÚ
-           ===================================================== */
-
-        const menuItems =
-            menu.querySelectorAll(
-                ".mz-mobile-item[data-target]"
-            );
-
-
-        menuItems.forEach(function (button) {
-
-            button.addEventListener(
+        nav
+            .querySelector(
+                '[data-target="home"]'
+            )
+            .addEventListener(
                 "click",
                 function () {
 
-                    const target =
-                        button.getAttribute(
-                            "data-target"
-                        );
-
-
-                    if (
-                        ejecutarNavegacion(
-                            target
-                        )
-                    ) {
-
-                        cerrarMenu();
-
-                    }
+                    navegar(
+                        home,
+                        "home"
+                    );
 
                 }
             );
 
-        });
+
+        nav
+            .querySelector(
+                '[data-target="movies"]'
+            )
+            .addEventListener(
+                "click",
+                function () {
+
+                    navegar(
+                        movies,
+                        "movies"
+                    );
+
+                }
+            );
+
+
+        nav
+            .querySelector(
+                '[data-target="series"]'
+            )
+            .addEventListener(
+                "click",
+                function () {
+
+                    navegar(
+                        series,
+                        "series"
+                    );
+
+                }
+            );
+
+
+        nav
+            .querySelector(
+                '[data-target="anime"]'
+            )
+            .addEventListener(
+                "click",
+                function () {
+
+                    navegar(
+                        anime,
+                        "anime"
+                    );
+
+                }
+            );
+
+
+        nav
+            .querySelector(
+                '[data-target="favorites"]'
+            )
+            .addEventListener(
+                "click",
+                function () {
+
+                    navegar(
+                        favorites,
+                        "favorites"
+                    );
+
+                }
+            );
 
 
         /* =====================================================
-           ESCAPE
+           BUSCADOR MÓVIL
            ===================================================== */
 
-        document.addEventListener(
+        const mobileSearchForm =
+            document.getElementById(
+                "mz-mobile-search-form"
+            );
+
+        const mobileSearchInput =
+            document.getElementById(
+                "mz-mobile-search-input"
+            );
+
+        mobileSearchForm.addEventListener(
+            "submit",
+            function (event) {
+
+                event.preventDefault();
+
+                const texto =
+                    mobileSearchInput.value.trim();
+
+                if (!texto) {
+
+                    mobileSearchInput.focus();
+
+                    return;
+
+                }
+
+                /*
+                 * Usamos el formulario original.
+                 * De esta forma app.js sigue haciendo
+                 * exactamente la misma búsqueda.
+                 */
+
+                const originalInput =
+                    document.getElementById(
+                        "search-input"
+                    );
+
+                const originalForm =
+                    document.getElementById(
+                        "search-form"
+                    );
+
+                if (
+                    originalInput &&
+                    originalForm
+                ) {
+
+                    originalInput.value =
+                        texto;
+
+                    originalForm.dispatchEvent(
+                        new Event(
+                            "submit",
+                            {
+                                bubbles: true,
+                                cancelable: true
+                            }
+                        )
+                    );
+
+                }
+
+                activar("home");
+
+                window.scrollTo({
+                    top: 0,
+                    behavior: "smooth"
+                });
+
+            }
+        );
+
+
+        /*
+         * Enter también funciona.
+         */
+
+        mobileSearchInput.addEventListener(
             "keydown",
             function (event) {
 
                 if (
-                    event.key === "Escape" &&
-                    menu.classList.contains("open")
+                    event.key === "Enter"
                 ) {
 
-                    cerrarMenu();
+                    event.preventDefault();
+
+                    mobileSearchForm.requestSubmit();
 
                 }
 
@@ -635,30 +674,62 @@
         );
 
 
-        /* =====================================================
-           BOTÓN ATRÁS EN MÓVIL
-           ===================================================== */
+        /*
+         * Detectar navegación desde otras partes
+         * y mantener el botón visualmente correcto.
+         */
 
-        window.addEventListener(
-            "popstate",
-            function () {
+        document.addEventListener(
+            "click",
+            function (event) {
 
-                cerrarMenu();
+                const target =
+                    event.target.closest(
+                        ".filter-tab, " +
+                        "#nav-link-home, " +
+                        "#nav-link-favoritos"
+                    );
+
+                if (!target) return;
+
+
+                if (
+                    target.id ===
+                    "nav-link-home"
+                ) {
+
+                    activar("home");
+
+                } else if (
+                    target.id ===
+                    "nav-link-favoritos"
+                ) {
+
+                    activar("favorites");
+
+                } else {
+
+                    const tipo =
+                        target.dataset.type;
+
+                    if (tipo) {
+
+                        activar(tipo);
+
+                    }
+
+                }
 
             }
         );
 
 
         console.log(
-            "MovieZone: menú móvil cargado correctamente."
+            "MovieZone: navegación móvil inferior cargada."
         );
 
     }
 
-
-    /* =========================================================
-       INICIAR
-       ========================================================= */
 
     if (
         document.readyState ===
@@ -667,12 +738,12 @@
 
         document.addEventListener(
             "DOMContentLoaded",
-            iniciarMenuMovil
+            initMovieZoneMobile
         );
 
     } else {
 
-        iniciarMenuMovil();
+        initMovieZoneMobile();
 
     }
 
