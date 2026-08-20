@@ -2560,7 +2560,7 @@ app.get("/api/catalogo", async (req, res) => {
             resultados,
             page,
             limit,
-            total: resultados.length
+            total
         });
     } catch (error) {
         console.error(error);
@@ -2589,7 +2589,7 @@ app.get("/api/series", async (req, res) => {
             resultados,
             page,
             limit,
-            total: resultados.length
+            total
         });
     } catch (error) {
         console.error(error);
@@ -2618,7 +2618,7 @@ app.get("/api/animes", async (req, res) => {
             resultados,
             page,
             limit,
-            total: resultados.length
+            total
         });
     } catch (error) {
         console.error(error);
