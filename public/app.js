@@ -223,12 +223,19 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
 // ======================================================
 // CARGA DE DATOS (conectado a tu server.js real)
 // ======================================================
-async function fetchSeccion(seccion, page, limit = LIMIT, options = {}) {
-    return getCatalog(seccion, page, limit);
+async function fetchSeccion(seccion, page, limit = LIMIT) {
+    const data = await getCatalog(seccion, page, limit);
+    
+    // Guardamos total para la paginación
+    gridTotalItems = data.total || 0;
+    gridTotalPages = Math.max(1, Math.ceil(gridTotalItems / limit));
+    
+    return data.resultados || [];
 }
 
 async function fetchBusqueda(termino) {
-    return searchCatalog(termino);
+    const data = await searchCatalog(termino);
+    return data.resultados || [];
 }
 
 async function cargarPaginaGrid() {
@@ -237,7 +244,7 @@ async function cargarPaginaGrid() {
 
     resultsLoading.classList.remove("hidden");
     resultsEmpty.classList.add("hidden");
-    resultsGrid.innerHTML = "";           // limpiamos siempre (ya no es infinite)
+    resultsGrid.innerHTML = "";
     scrollSentinel.classList.add("hidden");
 
     try {
@@ -249,13 +256,13 @@ async function cargarPaginaGrid() {
             gridTotalPages = 1;
             gridPage = 1;
         } else if (gridModo === "search") {
-            lista = await fetchBusquedaWithWakeup(gridTermino);
+            lista = await fetchBusqueda(gridTermino);
             gridTotalItems = lista.length;
             gridTotalPages = 1;
             gridPage = 1;
         } else {
-            // Sección normal (películas / series / anime)
-            lista = await fetchSeccionWithWakeup(gridSeccion, gridPage, LIMIT);
+            // Sección normal → aquí se actualiza gridTotalItems y gridTotalPages
+            lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
         }
 
         renderGridItems(lista, true);
@@ -265,7 +272,6 @@ async function cargarPaginaGrid() {
             resultsEmpty.classList.remove("hidden");
         }
 
-        // Actualizar controles de paginación
         actualizarPaginacion();
 
     } catch (err) {
