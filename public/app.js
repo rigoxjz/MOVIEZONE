@@ -100,6 +100,8 @@ function esEmbedInvalido(url) {
         u.includes("sblanh.com/") ||
         u.includes("sblanh") ||
         u.includes("sblanh.com/") ||
+        u.includes("lvturbo") ||   
+        u.includes("lvturbo.com/") ||
         u.includes("example") ||   
         u.includes("example.com") ||
         u.includes("4shared.com/") ||
