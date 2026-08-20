@@ -1924,3 +1924,35 @@ body {
 .page-info strong {
   color: var(--text-main);
 }
+
+/* ======================================================
+   MOVIEZONE - AJUSTE DE SECCIONES
+   ====================================================== */
+
+@media (max-width: 768px) {
+
+    /*
+     * Elimina el hueco grande al entrar a
+     * Películas / Series / Anime.
+     */
+
+    .grid-section {
+        margin-top: 0 !important;
+        padding-top: 70px !important;
+    }
+
+    .filter-toolbar {
+        margin-top: 56px !important;
+        top: 56px !important;
+    }
+
+    /*
+     * Cuando la toolbar está oculta (búsqueda/favoritos),
+     * no debe dejar espacio.
+     */
+
+    .filter-toolbar.hidden {
+        display: none !important;
+    }
+
+}
