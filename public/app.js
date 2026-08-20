@@ -645,89 +645,629 @@ function reproducir(embed, item) {
 }
 
 function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, item) {
-    const serversContainer = document.getElementById("servers-container");
-    const downloadsSection = document.getElementById("downloads-section");
-    const downloadsContainer = document.getElementById("downloads-list-container");
+
+    const serversContainer =
+        document.getElementById("servers-container");
+
+    const downloadsSection =
+        document.getElementById("downloads-section");
+
+    const downloadsContainer =
+        document.getElementById("downloads-list-container");
+
+    if (!serversContainer || !downloadsSection || !downloadsContainer) {
+        console.warn("MovieZone: contenedores de servidores no encontrados.");
+        return;
+    }
 
     serversContainer.innerHTML = "";
     downloadsContainer.innerHTML = "";
 
+    /* =========================================================
+       SERVIDORES
+       ========================================================= */
+
     let embeds = [];
-    if (Array.isArray(embedsRaw) && embedsRaw.length > 0) {
-        embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
-    } else if (fallbackUrl && !esEmbedInvalido(fallbackUrl)) {
-        embeds = [{ url: fallbackUrl, server: "Servidor" }];
+
+    if (
+        Array.isArray(embedsRaw) &&
+        embedsRaw.length > 0
+    ) {
+
+        embeds = embedsRaw.filter(
+            e =>
+                e &&
+                e.url &&
+                !esEmbedInvalido(e.url)
+        );
+
+    } else if (
+        fallbackUrl &&
+        !esEmbedInvalido(fallbackUrl)
+    ) {
+
+        embeds = [
+            {
+                url: fallbackUrl,
+                server: "Servidor"
+            }
+        ];
+
     }
 
-    // Vimeo/MovieZone primero
+
+    /* MovieZone / Vimeo primero */
+
     embeds.sort((a, b) => {
-        const aV = /vimeos/i.test(a.url || "") || a.server === "MovieZone";
-        const bV = /vimeos/i.test(b.url || "") || b.server === "MovieZone";
-        return (bV ? 1 : 0) - (aV ? 1 : 0);
+
+        const aV =
+            /vimeos/i.test(a.url || "") ||
+            a.server === "MovieZone";
+
+        const bV =
+            /vimeos/i.test(b.url || "") ||
+            b.server === "MovieZone";
+
+        return (
+            (bV ? 1 : 0) -
+            (aV ? 1 : 0)
+        );
+
     });
 
+
+    /*
+     * Crear botón desplegable de servidores
+     */
+
+    let serversToggle =
+        document.getElementById(
+            "mz-servers-toggle"
+        );
+
+    if (!serversToggle) {
+
+        serversToggle =
+            document.createElement("button");
+
+        serversToggle.id =
+            "mz-servers-toggle";
+
+        serversToggle.className =
+            "mz-collapse-toggle";
+
+        serversToggle.type =
+            "button";
+
+        serversToggle.innerHTML = `
+            <span class="mz-collapse-left">
+                <ion-icon name="play-circle-outline"></ion-icon>
+                <span>Servidores de reproducción</span>
+            </span>
+
+            <ion-icon
+                class="mz-collapse-arrow"
+                name="chevron-down-outline">
+            </ion-icon>
+        `;
+
+        serversContainer.parentNode.insertBefore(
+            serversToggle,
+            serversContainer
+        );
+
+    }
+
+
+    /*
+     * Estado inicial cerrado
+     */
+
+    serversContainer.classList.add(
+        "mz-collapsed-content"
+    );
+
+    serversToggle.classList.remove(
+        "open"
+    );
+
+
+    /*
+     * Abrir / cerrar servidores
+     */
+
+    serversToggle.onclick = function () {
+
+        const abierto =
+            serversContainer.classList.contains(
+                "mz-expanded-content"
+            );
+
+        if (abierto) {
+
+            serversContainer.classList.remove(
+                "mz-expanded-content"
+            );
+
+            serversContainer.classList.add(
+                "mz-collapsed-content"
+            );
+
+            serversToggle.classList.remove(
+                "open"
+            );
+
+        } else {
+
+            serversContainer.classList.remove(
+                "mz-collapsed-content"
+            );
+
+            serversContainer.classList.add(
+                "mz-expanded-content"
+            );
+
+            serversToggle.classList.add(
+                "open"
+            );
+
+        }
+
+    };
+
+
+    /*
+     * Crear servidores
+     */
+
     if (embeds.length > 0) {
-        embeds.forEach((embed, index) => {
-            const nombre = detectarServidor(embed.url, embed.server || embed.name);
-            const lang = embed.lang || embed.idioma || "";
-            const quality = embed.quality || embed.calidad || "";
 
-            const row = document.createElement("div");
-            row.className = "server-row" + (lang.toLowerCase().includes("latino") ? " latino-highlight" : "");
-            row.innerHTML = `
-                <div class="server-name-group">
-                    <ion-icon name="play-circle-outline" class="server-logo"></ion-icon>
-                    <div class="server-info">
-                        <span class="server-title">${escapeHtml(nombre)}${lang.toLowerCase().includes("latino") ? '<span class="latino-badge">Latino</span>' : ""}</span>
-                        <span class="server-lang">${escapeHtml([lang, quality].filter(Boolean).join(" · "))}</span>
+        embeds.forEach(
+            (embed, index) => {
+
+                const nombre =
+                    detectarServidor(
+                        embed.url,
+                        embed.server ||
+                        embed.name
+                    );
+
+                const lang =
+                    embed.lang ||
+                    embed.idioma ||
+                    "";
+
+                const quality =
+                    embed.quality ||
+                    embed.calidad ||
+                    "";
+
+
+                const row =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                row.className =
+                    "server-row" +
+                    (
+                        lang
+                            .toLowerCase()
+                            .includes("latino")
+                            ? " latino-highlight"
+                            : ""
+                    );
+
+
+                row.innerHTML = `
+
+                    <div class="server-name-group">
+
+                        <ion-icon
+                            name="play-circle-outline"
+                            class="server-logo">
+                        </ion-icon>
+
+                        <div class="server-info">
+
+                            <span class="server-title">
+
+                                ${escapeHtml(nombre)}
+
+                                ${
+                                    lang
+                                        .toLowerCase()
+                                        .includes("latino")
+                                        ? '<span class="latino-badge">Latino</span>'
+                                        : ""
+                                }
+
+                            </span>
+
+                            <span class="server-lang">
+
+                                ${escapeHtml(
+                                    [
+                                        lang,
+                                        quality
+                                    ]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                )}
+
+                            </span>
+
+                        </div>
+
                     </div>
-                </div>
-                <div class="server-actions">
-                    <button class="btn-action play" data-index="${index}">
-                        <ion-icon name="play"></ion-icon> Reproducir
-                    </button>
-                </div>
-            `;
-            row.querySelector(".btn-action.play").addEventListener("click", () => reproducir(embed, item));
-            serversContainer.appendChild(row);
-        });
+
+
+                    <div class="server-actions">
+
+                        <button
+                            class="btn-action play"
+                            data-index="${index}"
+                        >
+
+                            <ion-icon
+                                name="play">
+                            </ion-icon>
+
+                            Reproducir
+
+                        </button>
+
+                    </div>
+
+                `;
+
+
+                row
+                    .querySelector(
+                        ".btn-action.play"
+                    )
+                    .addEventListener(
+                        "click",
+                        () => reproducir(
+                            embed,
+                            item
+                        )
+                    );
+
+
+                serversContainer.appendChild(
+                    row
+                );
+
+            }
+        );
+
     } else {
-        serversContainer.innerHTML = `<div style="color:var(--text-muted); padding:20px 0; text-align:center;">Este contenido todavía no está disponible</div>`;
+
+        serversContainer.innerHTML = `
+
+            <div
+                style="
+                    color:var(--text-muted);
+                    padding:20px 0;
+                    text-align:center;
+                "
+            >
+
+                Este contenido todavía no está disponible
+
+            </div>
+
+        `;
+
     }
 
-    const downloads = Array.isArray(downloadsRaw) ? downloadsRaw : [];
+
+    /* =========================================================
+       DESCARGAS
+       ========================================================= */
+
+    const downloads =
+        Array.isArray(downloadsRaw)
+            ? downloadsRaw
+            : [];
+
+
     if (downloads.length > 0) {
-        downloadsSection.classList.remove("hidden");
-        downloads.forEach(dl => {
-            const url = dl.url || dl.link || (typeof dl === "string" ? dl : null);
-            if (!url || typeof url !== "string") return;
 
-            const nombre = detectarServidor(url, dl.server || dl.name || dl.host);
-            const lang = dl.lang || dl.idioma || "";
-            const quality = dl.quality || dl.calidad || "";
-            const size = dl.size ? ` (${dl.size})` : "";
+        downloadsSection.classList.remove(
+            "hidden"
+        );
 
-            const row = document.createElement("div");
-            row.className = "server-row";
-            row.innerHTML = `
-                <div class="server-name-group">
-                    <ion-icon name="cloud-download-outline" class="server-logo"></ion-icon>
-                    <div class="server-info">
-                        <span class="server-title">${escapeHtml(nombre)}</span>
-                        <span class="server-lang">${escapeHtml([lang, quality].filter(Boolean).join(" · "))}${escapeHtml(size)}</span>
-                    </div>
-                </div>
-                <div class="server-actions">
-                    <a class="btn-action download" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
-                        <ion-icon name="download"></ion-icon> Descargar
-                    </a>
-                </div>
+
+        /*
+         * Botón de descargas
+         */
+
+        let downloadsToggle =
+            document.getElementById(
+                "mz-downloads-toggle"
+            );
+
+
+        if (!downloadsToggle) {
+
+            downloadsToggle =
+                document.createElement(
+                    "button"
+                );
+
+            downloadsToggle.id =
+                "mz-downloads-toggle";
+
+            downloadsToggle.className =
+                "mz-collapse-toggle";
+
+            downloadsToggle.type =
+                "button";
+
+            downloadsToggle.innerHTML = `
+
+                <span class="mz-collapse-left">
+
+                    <ion-icon
+                        name="cloud-download-outline">
+                    </ion-icon>
+
+                    <span>
+                        Opciones de descarga
+                    </span>
+
+                </span>
+
+                <ion-icon
+                    class="mz-collapse-arrow"
+                    name="chevron-down-outline">
+                </ion-icon>
+
             `;
-            downloadsContainer.appendChild(row);
-        });
+
+
+            /*
+             * Lo ponemos antes de la lista
+             */
+
+            downloadsContainer.parentNode.insertBefore(
+                downloadsToggle,
+                downloadsContainer
+            );
+
+        }
+
+
+        /*
+         * Inicialmente cerrado
+         */
+
+        downloadsContainer.classList.add(
+            "mz-collapsed-content"
+        );
+
+        downloadsToggle.classList.remove(
+            "open"
+        );
+
+
+        /*
+         * Abrir / cerrar descargas
+         */
+
+        downloadsToggle.onclick =
+            function () {
+
+                const abierto =
+                    downloadsContainer
+                        .classList
+                        .contains(
+                            "mz-expanded-content"
+                        );
+
+
+                if (abierto) {
+
+                    downloadsContainer
+                        .classList
+                        .remove(
+                            "mz-expanded-content"
+                        );
+
+                    downloadsContainer
+                        .classList
+                        .add(
+                            "mz-collapsed-content"
+                        );
+
+                    downloadsToggle
+                        .classList
+                        .remove(
+                            "open"
+                        );
+
+                } else {
+
+                    downloadsContainer
+                        .classList
+                        .remove(
+                            "mz-collapsed-content"
+                        );
+
+                    downloadsContainer
+                        .classList
+                        .add(
+                            "mz-expanded-content"
+                        );
+
+                    downloadsToggle
+                        .classList
+                        .add(
+                            "open"
+                        );
+
+                }
+
+            };
+
+
+        /*
+         * Crear descargas
+         */
+
+        downloads.forEach(
+            dl => {
+
+                const url =
+                    dl.url ||
+                    dl.link ||
+                    (
+                        typeof dl === "string"
+                            ? dl
+                            : null
+                    );
+
+
+                if (
+                    !url ||
+                    typeof url !== "string"
+                ) {
+
+                    return;
+
+                }
+
+
+                const nombre =
+                    detectarServidor(
+                        url,
+                        dl.server ||
+                        dl.name ||
+                        dl.host
+                    );
+
+
+                const lang =
+                    dl.lang ||
+                    dl.idioma ||
+                    "";
+
+
+                const quality =
+                    dl.quality ||
+                    dl.calidad ||
+                    "";
+
+
+                const size =
+                    dl.size
+                        ? ` (${dl.size})`
+                        : "";
+
+
+                const row =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                row.className =
+                    "server-row";
+
+
+                row.innerHTML = `
+
+                    <div class="server-name-group">
+
+                        <ion-icon
+                            name="cloud-download-outline"
+                            class="server-logo">
+                        </ion-icon>
+
+                        <div class="server-info">
+
+                            <span class="server-title">
+
+                                ${escapeHtml(nombre)}
+
+                            </span>
+
+                            <span class="server-lang">
+
+                                ${escapeHtml(
+                                    [
+                                        lang,
+                                        quality
+                                    ]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                )}
+
+                                ${escapeHtml(size)}
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="server-actions">
+
+                        <a
+                            class="btn-action download"
+                            href="${escapeHtml(url)}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+
+                            <ion-icon
+                                name="download">
+                            </ion-icon>
+
+                            Descargar
+
+                        </a>
+
+                    </div>
+
+                `;
+
+
+                downloadsContainer.appendChild(
+                    row
+                );
+
+            }
+        );
+
+
     } else {
-        downloadsSection.classList.add("hidden");
+
+        downloadsSection.classList.add(
+            "hidden"
+        );
+
+
+        /*
+         * Si no hay descargas, eliminar
+         * botón anterior si existiera.
+         */
+
+        const oldToggle =
+            document.getElementById(
+                "mz-downloads-toggle"
+            );
+
+        if (oldToggle) {
+            oldToggle.remove();
+        }
+
     }
+
 }
 
 // ======================================================
