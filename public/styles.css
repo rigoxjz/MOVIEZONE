@@ -1956,3 +1956,221 @@ body {
     }
 
 }
+
+
+/* =========================================================
+   MOVIEZONE - SERVIDORES Y DESCARGAS DESPLEGABLES
+   ========================================================= */
+
+.mz-collapse-toggle {
+
+    width: 100%;
+
+    min-height: 52px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 12px;
+
+    margin: 10px 0;
+
+    padding: 13px 16px;
+
+    border: 1px solid rgba(255,255,255,.08);
+
+    border-radius: 10px;
+
+    background: rgba(255,255,255,.05);
+
+    color: var(--text-primary, #fff);
+
+    font-family: inherit;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background .2s ease,
+        border-color .2s ease;
+
+}
+
+
+.mz-collapse-toggle:hover {
+
+    background: rgba(255,255,255,.09);
+
+}
+
+
+.mz-collapse-toggle.open {
+
+    background: rgba(229,9,20,.10);
+
+    border-color:
+        rgba(229,9,20,.35);
+
+}
+
+
+.mz-collapse-left {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+.mz-collapse-left ion-icon {
+
+    font-size: 21px;
+
+    color: #e50914;
+
+}
+
+
+.mz-collapse-arrow {
+
+    font-size: 18px;
+
+    transition:
+        transform .2s ease;
+
+}
+
+
+.mz-collapse-toggle.open
+.mz-collapse-arrow {
+
+    transform:
+        rotate(180deg);
+
+}
+
+
+/* =========================================================
+   CONTENIDO OCULTO / VISIBLE
+   ========================================================= */
+
+.mz-collapsed-content {
+
+    display: none !important;
+
+}
+
+
+.mz-expanded-content {
+
+    display: block !important;
+
+}
+
+
+/* =========================================================
+   MÓVIL
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .mz-collapse-toggle {
+
+        min-height: 50px;
+
+        margin: 8px 0;
+
+        padding: 12px 13px;
+
+        font-size: 13px;
+
+    }
+
+
+    .mz-collapse-left ion-icon {
+
+        font-size: 19px;
+
+    }
+
+
+    .server-row {
+
+        padding: 10px;
+
+    }
+
+
+    .server-actions {
+
+        flex-shrink: 0;
+
+    }
+
+
+    .btn-action {
+
+        font-size: 11px;
+
+        padding: 8px 10px;
+
+    }
+
+}
+
+
+/* =========================================================
+   MOVIEZONE - CORRECCIÓN DEL ESPACIO SUPERIOR EN SECCIONES
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    #grid-view {
+
+        margin-top: 0 !important;
+
+        padding-top: 10px !important;
+
+    }
+
+
+    .grid-section {
+
+        margin-top: 0 !important;
+
+        padding-top: 10px !important;
+
+    }
+
+
+    .filter-toolbar {
+
+        margin-top: 10px !important;
+
+        top: auto !important;
+
+    }
+
+
+    /*
+     * Cuando no está visible la barra de filtros
+     * tampoco debe conservar espacio.
+     */
+
+    .filter-toolbar.hidden {
+
+        display: none !important;
+
+    }
+
+}
+
