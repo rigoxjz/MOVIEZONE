@@ -2218,3 +2218,12 @@ body {
         padding-top: 100px !important;
     }
 }
+
+
+@media (max-width: 768px) {
+
+    #grid-view {
+        margin-top: 90px !important;
+    }
+
+}
