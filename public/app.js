@@ -103,7 +103,8 @@ function esEmbedInvalido(url) {
         u.includes("lvturbo") ||   
         u.includes("lvturbo.com/") ||
         u.includes("example") ||   
-        u.includes("example.com") ||
+        u.includes("example.com") ||  
+        u.includes("voe.sx/") ||
         u.includes("4shared.com/") ||
         u.includes("play.php")
     );
