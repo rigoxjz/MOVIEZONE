@@ -5,7 +5,12 @@
 import { initWakeupNotice } from './js/ui/wakeup.js';
 import { getCatalog, searchCatalog } from './js/data/catalogo.js';
 
-const LIMIT = 24;
+const LIMIT = 28;
+
+// Estado de paginación
+let gridTotalItems = 0;
+let gridTotalPages = 1;
+
 const PLACEHOLDER = "https://via.placeholder.com/300x450/0a0611/ffffff?text=Sin+portada";
 
 // ---------- Elementos ----------
@@ -227,53 +232,55 @@ async function fetchBusqueda(termino) {
 }
 
 async function cargarPaginaGrid() {
-    if (gridCargando || gridSinMasResultados) return;
+    if (gridCargando) return;
     gridCargando = true;
 
-    const primerLote = gridPage === 1;
-    if (primerLote) {
-        resultsLoading.classList.remove("hidden");
-        resultsEmpty.classList.add("hidden");
-    } else {
-        scrollSentinel.classList.remove("hidden");
-    }
+    resultsLoading.classList.remove("hidden");
+    resultsEmpty.classList.add("hidden");
+    resultsGrid.innerHTML = "";           // limpiamos siempre (ya no es infinite)
+    scrollSentinel.classList.add("hidden");
 
     try {
         let lista = [];
 
         if (gridModo === "favoritos") {
             lista = obtenerFavoritos();
-            gridSinMasResultados = true;
+            gridTotalItems = lista.length;
+            gridTotalPages = 1;
+            gridPage = 1;
         } else if (gridModo === "search") {
-            lista = gridPage === 1 ? await fetchBusqueda(gridTermino) : [];
-            gridSinMasResultados = true; // búsqueda no pagina
+            lista = await fetchBusquedaWithWakeup(gridTermino);
+            gridTotalItems = lista.length;
+            gridTotalPages = 1;
+            gridPage = 1;
         } else {
-            lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
-            if (lista.length < LIMIT) gridSinMasResultados = true;
+            // Sección normal (películas / series / anime)
+            lista = await fetchSeccionWithWakeup(gridSeccion, gridPage, LIMIT);
         }
 
-        renderGridItems(lista, primerLote);
-        resultsCount.textContent = `${resultsGrid.children.length} items`;
+        renderGridItems(lista, true);
+        resultsCount.textContent = `${gridTotalItems} items`;
 
-        if (primerLote && resultsGrid.children.length === 0) {
+        if (lista.length === 0) {
             resultsEmpty.classList.remove("hidden");
         }
 
-        gridPage++;
+        // Actualizar controles de paginación
+        actualizarPaginacion();
+
     } catch (err) {
         console.error(err);
-        if (primerLote) {
-            resultsEmpty.classList.remove("hidden");
-            resultsEmpty.querySelector("p").textContent = "No se pudo cargar la sección.";
-        }
+        resultsEmpty.classList.remove("hidden");
+        resultsEmpty.querySelector("p").textContent = "No se pudo cargar la sección.";
     } finally {
         resultsLoading.classList.add("hidden");
-        scrollSentinel.classList.add("hidden");
         gridCargando = false;
     }
 }
 
+// ---------- Infinite scroll (DESACTIVADO - ahora usamos botones) ----------
 // ---------- Infinite scroll ----------
+/*
 const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
         if (entry.isIntersecting && vistaActual === "grid" && !gridSinMasResultados) {
@@ -282,6 +289,7 @@ const observer = new IntersectionObserver((entries) => {
     });
 }, { rootMargin: "300px" });
 observer.observe(scrollSentinel);
+*/
 
 // ======================================================
 // RENDER: TARJETAS (media-card)
@@ -761,8 +769,65 @@ window.addEventListener("scroll", () => {
     document.getElementById("netflix-navbar").classList.toggle("scrolled", window.scrollY > 20);
 });
 
+
+// ======================================================
+// PAGINACIÓN CON BOTONES
+// ======================================================
+function actualizarPaginacion() {
+    let paginacion = document.getElementById("pagination-controls");
+    
+    // Si no existe el contenedor, lo creamos
+    if (!paginacion) {
+        paginacion = document.createElement("div");
+        paginacion.id = "pagination-controls";
+        paginacion.className = "pagination-controls";
+        // Lo insertamos después del grid
+        resultsGrid.parentNode.insertBefore(paginacion, resultsGrid.nextSibling);
+    }
+
+    // Solo mostrar en modo categoría (no en búsqueda ni favoritos)
+    if (gridModo !== "categoria" || gridTotalPages <= 1) {
+        paginacion.classList.add("hidden");
+        paginacion.innerHTML = "";
+        return;
+    }
+
+    paginacion.classList.remove("hidden");
+
+    paginacion.innerHTML = `
+        <button class="btn-page" id="btn-prev-page" ${gridPage <= 1 ? "disabled" : ""}>
+            ← Anterior
+        </button>
+        
+        <span class="page-info">
+            Página <strong>${gridPage}</strong> de <strong>${gridTotalPages}</strong>
+        </span>
+        
+        <button class="btn-page" id="btn-next-page" ${gridPage >= gridTotalPages ? "disabled" : ""}>
+            Siguiente →
+        </button>
+    `;
+
+    document.getElementById("btn-prev-page")?.addEventListener("click", () => {
+        if (gridPage > 1) {
+            gridPage--;
+            cargarPaginaGrid();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    });
+
+    document.getElementById("btn-next-page")?.addEventListener("click", () => {
+        if (gridPage < gridTotalPages) {
+            gridPage++;
+            cargarPaginaGrid();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    });
+}
+
 // ======================================================
 // INICIO
 // ======================================================
+
 initWakeupNotice();
 cargarHome();
