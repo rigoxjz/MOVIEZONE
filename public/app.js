@@ -113,6 +113,7 @@ function esEmbedInvalido(url) {
         u.includes("diasfem.com/") ||
         u.includes("fembed.com") ||
         u.includes("sbfull.com") ||
+        u.includes("sbfast.com") ||
         u.includes("4shared.com/") ||
         u.includes("play.php")
     );
