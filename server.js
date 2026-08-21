@@ -2608,6 +2608,12 @@ function agregarSinDuplicar(item) {
         const nuevoTienePlayer =
             tienePlayerValido(item);
 
+        console.log(
+            `[Dedup] ${item.nombre || item.titulo} → ` +
+            `actual=${actual.fuente || "?"} player=${actualTienePlayer} | ` +
+            `nuevo=${item.fuente || "?"} player=${nuevoTienePlayer}`
+        );
+
         // El nuevo tiene reproductor y el actual no
         if (
             nuevoTienePlayer &&
