@@ -2497,28 +2497,235 @@ const resultadosFinales = [];
 function agregarSinDuplicar(item) {
     const key = claveDedup(item);
     const tituloKey = claveTitulo(item);
+
     if (!key && !tituloKey) return false;
 
-    // Misma clave exacta titulo|año
-    if (key && vistos.has(key)) return false;
-
-    // Mismo título aunque falte el año → quedarse con el de más score
-    if (tituloKey && vistosTitulo.has(tituloKey)) {
-        const idx = vistosTitulo.get(tituloKey);
-        const actual = resultadosFinales[idx];
-        if (scoreItem(item) > scoreItem(actual)) {
-            resultadosFinales[idx] = item;
-            if (key) vistos.add(key);
+    function tienePlayerValido(contenido) {
+        if (!contenido || typeof contenido !== "object") {
+            return false;
         }
+
+        // Player directo
+        if (
+            contenido.player &&
+            typeof contenido.player === "string" &&
+            !esEmbedInvalido(contenido.player)
+        ) {
+            return true;
+        }
+
+        // Reproductor directo alternativo
+        if (
+            contenido.reproductor &&
+            typeof contenido.reproductor === "string" &&
+            !esEmbedInvalido(contenido.reproductor)
+        ) {
+            return true;
+        }
+
+        // Embeds
+        if (Array.isArray(contenido.embeds)) {
+            const validos = contenido.embeds.filter(
+                e =>
+                    e &&
+                    e.url &&
+                    !esEmbedInvalido(e.url)
+            );
+
+            if (validos.length > 0) {
+                return true;
+            }
+        }
+
+        // Streams
+        if (Array.isArray(contenido.streams)) {
+            const validos = contenido.streams.filter(
+                s =>
+                    s &&
+                    s.url &&
+                    !esEmbedInvalido(s.url)
+            );
+
+            if (validos.length > 0) {
+                return true;
+            }
+        }
+
+        // Episodios con reproductores
+        if (Array.isArray(contenido.episodios)) {
+            for (const episodio of contenido.episodios) {
+
+                if (
+                    episodio &&
+                    Array.isArray(episodio.embeds)
+                ) {
+                    const validos =
+                        episodio.embeds.filter(
+                            e =>
+                                e &&
+                                e.url &&
+                                !esEmbedInvalido(e.url)
+                        );
+
+                    if (validos.length > 0) {
+                        return true;
+                    }
+                }
+
+                if (
+                    episodio &&
+                    episodio.player &&
+                    typeof episodio.player === "string" &&
+                    !esEmbedInvalido(episodio.player)
+                ) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
-    if (key) vistos.add(key);
-    if (tituloKey) vistosTitulo.set(tituloKey, resultadosFinales.length);
+    // ==================================================
+    // 1. MISMA CLAVE EXACTA: titulo + año
+    // ==================================================
+
+    if (key && vistos.has(key)) {
+
+        const idx = resultadosFinales.findIndex(
+            x => claveDedup(x) === key
+        );
+
+        if (idx === -1) {
+            return false;
+        }
+
+        const actual = resultadosFinales[idx];
+
+        const actualTienePlayer =
+            tienePlayerValido(actual);
+
+        const nuevoTienePlayer =
+            tienePlayerValido(item);
+
+        // El nuevo tiene reproductor y el actual no
+        if (
+            nuevoTienePlayer &&
+            !actualTienePlayer
+        ) {
+            resultadosFinales[idx] = item;
+
+            if (tituloKey) {
+                vistosTitulo.set(
+                    tituloKey,
+                    idx
+                );
+            }
+
+            return false;
+        }
+
+        // El actual tiene reproductor y el nuevo no
+        if (
+            actualTienePlayer &&
+            !nuevoTienePlayer
+        ) {
+            return false;
+        }
+
+        // Ambos tienen reproductor:
+        // preferimos Lamovie.
+        if (
+            item.fuente === "lamovie" &&
+            actual.fuente !== "lamovie"
+        ) {
+            resultadosFinales[idx] = item;
+        }
+
+        return false;
+    }
+
+    // ==================================================
+    // 2. MISMO TÍTULO PERO SIN AÑO
+    // ==================================================
+
+    if (
+        tituloKey &&
+        vistosTitulo.has(tituloKey)
+    ) {
+
+        const idx =
+            vistosTitulo.get(tituloKey);
+
+        const actual =
+            resultadosFinales[idx];
+
+        const actualTienePlayer =
+            tienePlayerValido(actual);
+
+        const nuevoTienePlayer =
+            tienePlayerValido(item);
+
+        // Nuevo tiene player y actual no
+        if (
+            nuevoTienePlayer &&
+            !actualTienePlayer
+        ) {
+            resultadosFinales[idx] = item;
+            return false;
+        }
+
+        // Actual tiene player y nuevo no
+        if (
+            actualTienePlayer &&
+            !nuevoTienePlayer
+        ) {
+            return false;
+        }
+
+        // Ambos tienen player:
+        // Lamovie tiene prioridad.
+        if (
+            item.fuente === "lamovie" &&
+            actual.fuente !== "lamovie"
+        ) {
+            resultadosFinales[idx] = item;
+            return false;
+        }
+
+        // Si ninguno tiene player,
+        // conservamos el de mayor score.
+        if (
+            scoreItem(item) >
+            scoreItem(actual)
+        ) {
+            resultadosFinales[idx] = item;
+        }
+
+        return false;
+    }
+
+    // ==================================================
+    // 3. CONTENIDO NUEVO
+    // ==================================================
+
+    if (key) {
+        vistos.add(key);
+    }
+
+    if (tituloKey) {
+        vistosTitulo.set(
+            tituloKey,
+            resultadosFinales.length
+        );
+    }
+
     resultadosFinales.push(item);
+
     return true;
 }
 
+    
 // Primero los de Lamovie (tienen prioridad)
 for (const item of resultados) {
     agregarSinDuplicar(item);
