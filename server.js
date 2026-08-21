@@ -2509,7 +2509,7 @@ function agregarSinDuplicar(item) {
         if (
             contenido.player &&
             typeof contenido.player === "string" &&
-            !esEmbedInvalido(contenido.player)
+            !esReproductorValido(contenido.player)
         ) {
             return true;
         }
@@ -2518,7 +2518,7 @@ function agregarSinDuplicar(item) {
         if (
             contenido.reproductor &&
             typeof contenido.reproductor === "string" &&
-            !esEmbedInvalido(contenido.reproductor)
+            !esReproductorValido(contenido.reproductor)
         ) {
             return true;
         }
@@ -2529,7 +2529,7 @@ function agregarSinDuplicar(item) {
                 e =>
                     e &&
                     e.url &&
-                    !esEmbedInvalido(e.url)
+                    !esReproductorValido(e.url)
             );
 
             if (validos.length > 0) {
@@ -2543,7 +2543,7 @@ function agregarSinDuplicar(item) {
                 s =>
                     s &&
                     s.url &&
-                    !esEmbedInvalido(s.url)
+                    !esReproductorValido(s.url)
             );
 
             if (validos.length > 0) {
@@ -2564,7 +2564,7 @@ function agregarSinDuplicar(item) {
                             e =>
                                 e &&
                                 e.url &&
-                                !esEmbedInvalido(e.url)
+                                !esReproductorValido(e.url)
                         );
 
                     if (validos.length > 0) {
@@ -2576,7 +2576,7 @@ function agregarSinDuplicar(item) {
                     episodio &&
                     episodio.player &&
                     typeof episodio.player === "string" &&
-                    !esEmbedInvalido(episodio.player)
+                    !esReproductorValido(episodio.player)
                 ) {
                     return true;
                 }
