@@ -104,7 +104,7 @@ function esEmbedInvalido(url) {
         u.includes("lamovie") ||
         u.includes("sblanh.com/") ||
         u.includes("sblanh") ||
-        u.includes("sblanh.com/") ||
+        u.includes("sblanh.com/") || 
         u.includes("lvturbo") ||   
         u.includes("lvturbo.com/") ||
         u.includes("example") ||   
@@ -112,6 +112,7 @@ function esEmbedInvalido(url) {
         u.includes("voe.sx/") ||
         u.includes("diasfem.com/") ||
         u.includes("fembed.com") ||
+        u.includes("sbfull.com") ||
         u.includes("4shared.com/") ||
         u.includes("play.php")
     );
