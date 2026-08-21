@@ -373,10 +373,10 @@ function esReproductorValido(url) {
 
     if (esYouTube(url)) return false;
     if (esReproductorLamovie(url)) return false;
-
+    
     // Rechazar imágenes (pósters, backdrops, etc. que aparecen sueltas en el HTML)
     if (/\.(jpg|jpeg|png|webp|gif|svg|ico|bmp)(\?|$)/i.test(u)) return false;
-    if (u.includes("image.tmdb.org") || u.includes("themoviedb.org")) return false;
+    if (u.includes("image.tmdb.org") || u.includes("sbfull.com") || u.includes("sbfast.com") || u.includes("themoviedb.org")) return false;
 
     // Rechazar hojas de estilo, fuentes y scripts que a veces se cuelan también
     if (/\.(css|woff2?|ttf|eot)(\?|$)/i.test(u)) return false;
