@@ -2734,12 +2734,18 @@ function agregarSinDuplicar(item) {
     
 // Primero los de Lamovie (tienen prioridad)
 for (const item of resultados) {
-    agregarSinDuplicar(item);
+    agregarSinDuplicar({
+        ...item,
+        fuente: "lamovie"
+    });
 }
 
 // Luego los de Hackstore que no estén ya
 for (const item of resultadosHackstore) {
-    agregarSinDuplicar(item);
+    agregarSinDuplicar({
+        ...item,
+        fuente: "hackstore"
+    });
 }
 
 // Por último, lo que ya teníamos guardado en Supabase para este término
