@@ -99,6 +99,9 @@ const session = axios.create({
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const GITHUB_DATA_URL = process.env.GITHUB_DATA_URL || "";
+// true = si ya tiene player, solo Supabase (recomendado)
+// false = vuelve al comportamiento viejo (re-scrape más a menudo)
+const SKIP_ENRICH_SI_VALIDO = process.env.SKIP_ENRICH_SI_VALIDO !== "0";
 
 // Set de links que ya existen en el JSON de GitHub
 // Base de datos en memoria (cargada desde GitHub)
@@ -3127,8 +3130,8 @@ app.get("/api/detalle", async (req, res) => {
         const esSerieOAnime = item.tipo === "Serie" || item.tipo === "Anime";
         const yaValido = itemTieneContenidoValido(item);
 
-        // Cualquier título (peli/serie/anime) con contenido válido → devolver de Supabase
-        if (yaValido && !force) {
+        // Si está activado y ya tiene player → solo Supabase (salvo force=1)
+        if (SKIP_ENRICH_SI_VALIDO && yaValido && !force) {
             console.log(`[Cache] Desde Supabase (ya válido): "${item.nombre}"`);
             return res.json(item);
         }
