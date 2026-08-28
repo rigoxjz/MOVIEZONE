@@ -662,16 +662,22 @@ async function abrirDetalle(item, autoPlay = false, force = false) {
 }
 
 function cerrarDetalle() {
+    detenerSeguimientoProgreso(true);
     detailsPanel.classList.add("hidden");
     document.body.style.overflow = "";
+    document.body.classList.remove("player-open");
     playerIframe.src = "about:blank";
     videoContainer.classList.add("hidden");
+    cargarContinuarViendo();
 }
 document.getElementById("btn-close-modal").addEventListener("click", cerrarDetalle);
 document.getElementById("modal-backdrop-close").addEventListener("click", cerrarDetalle);
 document.getElementById("close-player-btn").addEventListener("click", () => {
+    detenerSeguimientoProgreso(true);
     videoContainer.classList.add("hidden");
     playerIframe.src = "about:blank";
+    document.body.classList.remove("player-open");
+    cargarContinuarViendo();
 });
 
 // ---------- Favoritos ----------
@@ -766,11 +772,13 @@ function renderEpisodios(item) {
 
 // ---------- Servidores y descargas ----------
 function reproducir(embed, item) {
-    if (!embed || !embed.url) return;
+    if (!embed?.url) return;
+    videoContainer.classList.remove("hidden");
     playerIframe.src = embed.url;
     playerTitle.textContent = item?.nombre || "Reproduciendo...";
-    videoContainer.classList.remove("hidden");
-    videoContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+    iniciarSeguimientoProgreso(item || seleccionActual);
+    // evita pull-to-refresh sobre el player
+    document.body.classList.add("player-open");
 }
 
 function renderServidoresYDescargas(embedsRaw, downloadsRaw, fallbackUrl, item) {
@@ -1542,28 +1550,96 @@ cargarHome();
 })();
 
 // ---------- Continuar viendo (localStorage) ----------
+let progresoTimer = null;
+let progresoActual = null; // { key, item, segundos, duracion }
+
+function claveProgreso(item) {
+    return item?.link || (item?.id != null ? String(item.id) : null) || item?.postId || null;
+}
+
 function obtenerProgreso() {
     try { return JSON.parse(localStorage.getItem("moviezone_progress") || "{}"); }
     catch { return {}; }
 }
+
 function guardarProgreso(item, segundos = 0, duracion = 0) {
-    if (!item?.link && !item?.id) return;
-    const key = item.link || String(item.id);
+    const key = claveProgreso(item);
+    if (!key) return;
     const all = obtenerProgreso();
-    all[key] = { ...item, segundos, duracion, updated: Date.now() };
-    localStorage.setItem("moviezone_progress", JSON.stringify(all));
+    all[key] = {
+        link: item.link || null,
+        id: item.id || item.postId || null,
+        nombre: item.nombre,
+        portada: item.portada,
+        tipo: item.tipo,
+        year: item.year,
+        calificacion: item.calificacion,
+        segundos: Math.max(0, Math.floor(segundos)),
+        duracion: Math.max(0, Math.floor(duracion)),
+        updated: Date.now()
+    };
+    // máximo 30 títulos
+    const ordenados = Object.entries(all).sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0)).slice(0, 30);
+    localStorage.setItem("moviezone_progress", JSON.stringify(Object.fromEntries(ordenados)));
 }
+
+function iniciarSeguimientoProgreso(item) {
+    detenerSeguimientoProgreso();
+    const key = claveProgreso(item);
+    if (!key) return;
+    const prev = obtenerProgreso()[key];
+    progresoActual = {
+        key,
+        item,
+        segundos: prev?.segundos || 0,
+        duracion: prev?.duracion || 0
+    };
+    // Cada 15s guarda (los iframes de terceros no dan currentTime fiable)
+    progresoTimer = setInterval(() => {
+        if (!progresoActual) return;
+        progresoActual.segundos += 15;
+        guardarProgreso(progresoActual.item, progresoActual.segundos, progresoActual.duracion || progresoActual.segundos + 60);
+    }, 15000);
+}
+
+function detenerSeguimientoProgreso(guardar = true) {
+    if (progresoTimer) {
+        clearInterval(progresoTimer);
+        progresoTimer = null;
+    }
+    if (guardar && progresoActual) {
+        guardarProgreso(progresoActual.item, progresoActual.segundos, progresoActual.duracion || progresoActual.segundos + 60);
+    }
+    progresoActual = null;
+}
+
 function cargarContinuarViendo() {
     const all = obtenerProgreso();
     const lista = Object.values(all)
+        .filter(x => x && (x.segundos || 0) > 10)
         .sort((a, b) => (b.updated || 0) - (a.updated || 0))
         .slice(0, 12);
     const row = document.getElementById("row-continuar");
     const cont = document.getElementById("carousel-continuar");
     if (!row || !cont) return;
-    if (!lista.length) { row.classList.add("hidden"); return; }
+    if (!lista.length) {
+        row.classList.add("hidden");
+        return;
+    }
     row.classList.remove("hidden");
-    renderCarousel("carousel-continuar", lista);
+    cont.innerHTML = "";
+    lista.forEach(item => {
+        const card = crearMediaCard(item);
+        // barra de progreso
+        const pct = item.duracion > 0
+            ? Math.min(100, Math.round((item.segundos / item.duracion) * 100))
+            : Math.min(95, Math.round((item.segundos / 600) * 100)); // fallback ~10 min
+        const bar = document.createElement("div");
+        bar.className = "progress-bar-wrap";
+        bar.innerHTML = `<div class="progress-bar-fill" style="width:${pct}%"></div>`;
+        card.querySelector(".poster-wrapper")?.appendChild(bar);
+        cont.appendChild(card);
+    });
 }
 
 // ---------- Recién añadidos ----------
