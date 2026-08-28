@@ -2227,3 +2227,52 @@ body {
     }
 
 }
+
+/* Botón Buscar online */
+.btn-buscar-online {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+}
+.btn-buscar-online:hover:not(:disabled) {
+    transform: scale(1.03);
+}
+.btn-buscar-online:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+.btn-buscar-online.hidden {
+    display: none;
+}
+.btn-buscar-online ion-icon {
+    font-size: 1.1rem;
+}
+.spinner-inline {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Ajuste del header para que el botón quepa bien */
+.grid-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
