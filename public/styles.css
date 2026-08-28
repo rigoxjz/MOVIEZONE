@@ -2346,3 +2346,60 @@ body {
   background: linear-gradient(90deg, #a855f7, #c084fc);
   border-radius: 0 2px 2px 0;
 }
+
+/* Cerrar detalle: se queda arriba derecha, z-index alto */
+.btn-close-modal {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 120;
+  /* tamaño que ya te gusta: no lo cambies */
+}
+
+/* Cuando hay video, el header del player no compite con el rojo */
+.video-player-container .player-header {
+  padding: 12px 16px;
+  padding-right: 56px; /* deja hueco al botón rojo del modal */
+  z-index: 15;
+}
+
+.btn-close-player {
+  width: 36px;
+  height: 36px;
+  margin-left: auto; /* se queda a la derecha del header del player, pero bajo el hueco */
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* En móvil: cerrar video a la IZQUIERDA del header del player */
+@media (max-width: 768px) {
+  .video-player-container .player-header {
+    justify-content: flex-start;
+    gap: 10px;
+    padding-right: 60px;
+  }
+  .btn-close-player {
+    order: -1; /* primero a la izquierda */
+    margin-left: 0;
+    margin-right: auto;
+  }
+  #player-title {
+    font-size: 13px;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+/* Evita que al deslizar sobre el video se recargue la página */
+body.player-open {
+  overscroll-behavior-y: none;
+  touch-action: pan-x;
+  overflow: hidden;
+}
+.video-player-container,
+.player-iframe-wrapper,
+.player-iframe-wrapper iframe {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
