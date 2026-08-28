@@ -1705,9 +1705,6 @@ function cargarContinuarViendo() {
         clone.addEventListener("click", () => abrirDesdeProgreso(item));
         cont.appendChild(clone);
     });
-
-        cont.appendChild(card);
-    });
 }
 
 // ---------- Recién añadidos ----------
