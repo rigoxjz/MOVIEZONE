@@ -695,6 +695,22 @@ document.getElementById("btn-favorito").addEventListener("click", () => {
     actualizarBotonFavorito();
 });
 
+document.getElementById("btn-share")?.addEventListener("click", async () => {
+    if (!seleccionActual) return;
+    const link = seleccionActual.link || seleccionActual.id || seleccionActual.postId;
+    if (!link) return;
+    const url = `${location.origin}/?link=${encodeURIComponent(String(link))}`;
+    try {
+        await navigator.clipboard.writeText(url);
+        const btn = document.getElementById("btn-share");
+        const prev = btn.innerHTML;
+        btn.innerHTML = `<ion-icon name="checkmark-outline"></ion-icon>`;
+        setTimeout(() => { btn.innerHTML = prev; }, 1500);
+    } catch {
+        prompt("Copia este enlace:", url);
+    }
+});
+
 document.getElementById("btn-refresh-servers")?.addEventListener("click", async () => {
     if (!seleccionActual || gridCargando) return;
     const btn = document.getElementById("btn-refresh-servers");
