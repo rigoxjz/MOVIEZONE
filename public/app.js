@@ -49,6 +49,8 @@ let gridTermino = "";
 let gridPage = 1;
 let gridCargando = false;
 let gridSinMasResultados = false;
+let gridSort = "recent";       // recent | rating | az
+let gridTypeFilter = "all";    // all | movie | series | anime
 let heroItems = [];
 let heroIndex = 0;
 let heroTimer = null;
@@ -185,6 +187,33 @@ function mostrarHome() {
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function aplicarFiltrosYOrden(lista) {
+    let res = [...(lista || [])];
+
+    if (gridTypeFilter !== "all") {
+        const map = { movie: "Película", series: "Serie", anime: "Anime" };
+        const wanted = map[gridTypeFilter] || gridTypeFilter;
+        res = res.filter(i => {
+            const t = (i.tipo || "").toString();
+            return t === wanted || t.toLowerCase().includes(gridTypeFilter);
+        });
+    }
+
+    if (gridSort === "rating") {
+        res.sort((a, b) => (Number(b.calificacion) || 0) - (Number(a.calificacion) || 0));
+    } else if (gridSort === "az") {
+        res.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" }));
+    } else {
+        // más reciente
+        res.sort((a, b) => {
+            const da = a.created_at ? new Date(a.created_at).getTime() : (Number(a.year) || 0);
+            const db = b.created_at ? new Date(b.created_at).getTime() : (Number(b.year) || 0);
+            return db - da;
+        });
+    }
+    return res;
+}
+
 function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
     vistaActual = "grid";
     gridModo = modo;
@@ -206,8 +235,8 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
 
     if (modo === "search") {
         resultsTitle.textContent = `Resultados para "${termino}"`;
-        document.getElementById("filter-toolbar").classList.add("hidden");
-        busquedaEsLocal = true; // por si se llama desde otro sitio
+        document.getElementById("filter-toolbar").classList.remove("hidden");
+        busquedaEsLocal = true;
     } else if (modo === "favoritos") {
         resultsTitle.innerHTML = `<ion-icon name="heart" style="vertical-align:-3px;"></ion-icon> Mis Favoritos`;
         document.getElementById("filter-toolbar").classList.add("hidden");
@@ -290,7 +319,10 @@ async function cargarPaginaGrid() {
     if (gridCargando) return;
     gridCargando = true;
 
-    resultsLoading.classList.remove("hidden");
+    // Skeleton en vez de solo spinner
+    const skeleton = document.getElementById("results-skeleton");
+    if (skeleton) skeleton.classList.remove("hidden");
+    resultsLoading.classList.add("hidden");          // ocultamos el spinner viejo
     resultsEmpty.classList.add("hidden");
     resultsGrid.innerHTML = "";
     scrollSentinel.classList.add("hidden");
@@ -317,10 +349,14 @@ async function cargarPaginaGrid() {
             lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
         }
 
-        renderGridItems(lista, true);
-        resultsCount.textContent = `${gridTotalItems} items`;
+        // Aplica filtros de tipo + orden (Más reciente / Calificación / A-Z)
+        const listaFinal = aplicarFiltrosYOrden(lista);
 
-        if (lista.length === 0) {
+        renderGridItems(listaFinal, true);
+        resultsCount.textContent = `${listaFinal.length} items` +
+            (gridTotalItems > listaFinal.length ? ` (de ${gridTotalItems})` : "");
+
+        if (listaFinal.length === 0) {
             resultsEmpty.classList.remove("hidden");
         }
 
@@ -331,6 +367,8 @@ async function cargarPaginaGrid() {
         resultsEmpty.classList.remove("hidden");
         resultsEmpty.querySelector("p").textContent = "No se pudo cargar la sección.";
     } finally {
+        // Ocultar skeleton cuando termina de cargar
+        if (skeleton) skeleton.classList.add("hidden");
         resultsLoading.classList.add("hidden");
         gridCargando = false;
     }
@@ -361,7 +399,7 @@ function crearMediaCard(item) {
     const tipo = tipoLabel(item.tipo);
     // Siempre mostrar calificación (0 si no tiene)
     const rating = item.calificacion ? Number(item.calificacion).toFixed(1) : "0";
-    const tieneVideo = itemTieneVideo(item);
+    const tieneVideo = item.tiene_player === true || itemTieneVideo(item);
 
     card.innerHTML = `
         <div class="poster-wrapper">
@@ -370,7 +408,7 @@ function crearMediaCard(item) {
             <div class="rating-badge"><ion-icon name="star"></ion-icon> ${escapeHtml(rating)}</div>
             <span class="type-badge">${escapeHtml(tipo)}</span>
             <span class="availability-badge ${tieneVideo ? "available" : "unavailable"}">
-                <span class="dot"></span> Disponible
+                <span class="dot"></span> ${tieneVideo ? "▶ Listo" : "Sin servidores"}
             </span>
         </div>
         <div class="media-info">
@@ -483,6 +521,8 @@ async function cargarHome() {
         renderCarousel("carousel-movies", peliculas);
         renderCarousel("carousel-series", series);
         renderCarousel("carousel-anime", anime);
+        cargarContinuarViendo();
+        cargarRecienAnadidos();
 
         iniciarHero(peliculas.length ? peliculas : series);
 
@@ -505,7 +545,8 @@ const videoContainer = document.getElementById("video-player-container");
 const playerIframe = document.getElementById("player-iframe");
 const playerTitle = document.getElementById("player-title");
 
-async function abrirDetalle(item, autoPlay = false) {
+
+async function abrirDetalle(item, autoPlay = false, force = false) {
     seleccionActual = item;
 
     detailsEmpty.classList.add("hidden");
@@ -570,6 +611,7 @@ async function abrirDetalle(item, autoPlay = false) {
             const params = new URLSearchParams();
             if (item.postId) params.set("postId", item.postId);
             if (item.link) params.set("link", item.link);
+            if (force) params.set("force", "1");
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -625,6 +667,23 @@ document.getElementById("btn-favorito").addEventListener("click", () => {
     if (!seleccionActual) return;
     toggleFavoritoItem(seleccionActual);
     actualizarBotonFavorito();
+});
+
+document.getElementById("btn-refresh-servers")?.addEventListener("click", async () => {
+    if (!seleccionActual || gridCargando) return;
+    const btn = document.getElementById("btn-refresh-servers");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<div class="spinner-inline"></div> Actualizando...`;
+    }
+    try {
+        await abrirDetalle(seleccionActual, false, true); // tercer param = force
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<ion-icon name="refresh-outline"></ion-icon><span>Actualizar servidores</span>`;
+        }
+    }
 });
 
 // ---------- Temporadas y episodios ----------
@@ -1354,13 +1413,28 @@ document.querySelectorAll(".filter-tab").forEach(tab => {
 
 document.querySelectorAll(".filter-chip").forEach(chip => {
     chip.addEventListener("click", () => {
-        const tipo = chip.dataset.type;
-        if (tipo === "all") {
+        document.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        gridTypeFilter = chip.dataset.type || "all";
+
+        // Si estamos en búsqueda o favoritos → solo filtramos lo que ya hay
+        if (gridModo === "search" || gridModo === "favoritos") {
+            if (vistaActual === "grid") cargarPaginaGrid();
+            return;
+        }
+
+        // Si es categoría normal → cambiamos de sección
+        if (gridTypeFilter === "all") {
             mostrarGrid({ modo: "categoria", seccion: "movie" });
         } else {
-            mostrarGrid({ modo: "categoria", seccion: tipo });
+            mostrarGrid({ modo: "categoria", seccion: gridTypeFilter });
         }
     });
+});
+
+document.getElementById("sort-select")?.addEventListener("change", (e) => {
+    gridSort = e.target.value || "recent";
+    if (vistaActual === "grid") cargarPaginaGrid();
 });
 
 // Efecto de navbar al hacer scroll
@@ -1430,3 +1504,65 @@ function actualizarPaginacion() {
 
 initWakeupNotice();
 cargarHome();
+
+
+
+// ---------- Deep link /?id=... o /?link=... ----------
+(async function handleDeepLink() {
+    const p = new URLSearchParams(location.search);
+    const id = p.get("id");
+    const link = p.get("link");
+    if (!id && !link) return;
+    try {
+        const q = id ? `id=${encodeURIComponent(id)}` : `link=${encodeURIComponent(link)}`;
+        const res = await fetch(`/api/detalle?${q}`);
+        const item = await res.json();
+        if (item && (item.nombre || item.link)) abrirDetalle(item);
+    } catch (e) { console.warn("Deep link:", e); }
+})();
+
+// ---------- Continuar viendo (localStorage) ----------
+function obtenerProgreso() {
+    try { return JSON.parse(localStorage.getItem("moviezone_progress") || "{}"); }
+    catch { return {}; }
+}
+function guardarProgreso(item, segundos = 0, duracion = 0) {
+    if (!item?.link && !item?.id) return;
+    const key = item.link || String(item.id);
+    const all = obtenerProgreso();
+    all[key] = { ...item, segundos, duracion, updated: Date.now() };
+    localStorage.setItem("moviezone_progress", JSON.stringify(all));
+}
+function cargarContinuarViendo() {
+    const all = obtenerProgreso();
+    const lista = Object.values(all)
+        .sort((a, b) => (b.updated || 0) - (a.updated || 0))
+        .slice(0, 12);
+    const row = document.getElementById("row-continuar");
+    const cont = document.getElementById("carousel-continuar");
+    if (!row || !cont) return;
+    if (!lista.length) { row.classList.add("hidden"); return; }
+    row.classList.remove("hidden");
+    renderCarousel("carousel-continuar", lista);
+}
+
+// ---------- Recién añadidos ----------
+async function cargarRecienAnadidos() {
+    try {
+        const res = await fetch("/api/recien?limit=12");
+        const data = await res.json();
+        renderCarousel("carousel-recien", data.resultados || []);
+    } catch {
+        const el = document.getElementById("carousel-recien");
+        if (el) el.innerHTML = `<p style="color:var(--text-muted)">No disponible</p>`;
+    }
+}
+
+// Llamar desde cargarHome() después de los carousels normales:
+// cargarContinuarViendo();
+// cargarRecienAnadidos();
+
+// ---------- PWA ----------
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
