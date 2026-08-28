@@ -835,11 +835,14 @@ async function procesarPaginaHackstore(link) {
             episodiosProcesados.push({
                 nombre: epSoloTrailer ? `${ep.nombre} (Solo trailer)` : ep.nombre,
                 link: ep.link,
-                video,
-                embeds: (reproductor && esReproductorValido(reproductor))
-                    ? [{ url: reproductor, server: detectarServerDesdeUrl(reproductor, "Servidor"), name: detectarServerDesdeUrl(reproductor, "Servidor") }]
+                video: (video && esReproductorValido(video)) ? video : null,
+                embeds: (video && esReproductorValido(video))
+                    ? [{
+                        url: video,
+                        server: detectarServerDesdeUrl(video, "Servidor"),
+                        name: detectarServerDesdeUrl(video, "Servidor")
+                      }]
                     : [],
-                reproductor: (reproductor && esReproductorValido(reproductor)) ? reproductor : null,
                 downloads: [],
                 soloTrailer: epSoloTrailer
             });
@@ -868,8 +871,14 @@ async function procesarPaginaHackstore(link) {
         certificacion: null,
         ultimo_episodio: null,
         link,
-        reproductor: reproductor || null,
-        embeds: reproductor ? [{ url: reproductor, server: "Hackstore", name: "Hackstore" }] : [],
+        reproductor: (reproductor && esReproductorValido(reproductor)) ? reproductor : null,
+        embeds: (reproductor && esReproductorValido(reproductor))
+            ? [{
+                url: reproductor,
+                server: detectarServerDesdeUrl(reproductor, "Servidor"),
+                name: detectarServerDesdeUrl(reproductor, "Servidor")
+            }]
+            : [],
         downloads: [],
         soloTrailer,
         episodios: episodiosProcesados,
