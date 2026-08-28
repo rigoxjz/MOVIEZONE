@@ -184,6 +184,7 @@ function mostrarHome() {
     gridView.classList.add("hidden");
     document.querySelectorAll(".filter-tab, .filter-chip").forEach(el => el.classList.remove("active"));
     document.getElementById("nav-item-home").classList.add("active");
+    actualizarBotonOnline(false);   // ← ocultar “Buscar online”
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -221,6 +222,12 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
     gridTermino = termino;
     gridPage = 1;
     gridSinMasResultados = false;
+
+    // Si NO es búsqueda → ocultar “Buscar online”
+    if (modo !== "search") {
+        actualizarBotonOnline(false);
+        busquedaEsLocal = true;
+    }
 
     homeView.classList.add("hidden");
     gridView.classList.remove("hidden");
