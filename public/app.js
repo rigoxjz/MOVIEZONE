@@ -98,27 +98,26 @@ function tipoLabel(tipo) {
     return "Película";
 }
 
+const REPRODUCTORES_PERMITIDOS = [
+    "vimeos.net", "player.vimeos", "goodstream", "streamwish", "filemoon",
+    "voe.sx", "voe.", "doodstream", "dood.", "ds2play", "streamtape",
+    "mixdrop", "upstream", "vidmoly", "mp4upload", "uqload",
+    "vidhide", "vidguard", "lulustream", "filelions", "yourupload",
+    "supervideo", "krakenfiles", "ok.ru"
+];
+
+const REPRODUCTORES_BLOQUEADOS = [
+    "sblongvu", "sblanh", "sbfull", "sbfast", "sbthe", "sbanh",
+    "lvturbo", "diasfem", "fembed", "4shared", "lamovie",
+    "youtube.com", "youtu.be", "play.php", "example.com", "hackstore.fo"
+];
+
 function esEmbedInvalido(url) {
     if (!url) return true;
     const u = String(url).toLowerCase();
-    return (
-        u.includes("lamovie.org/embed") ||
-        u.includes("lamovie") ||
-        u.includes("sblanh.com/") ||
-        u.includes("sblanh") ||
-        u.includes("sblanh.com/") || 
-        u.includes("lvturbo") ||   
-        u.includes("lvturbo.com/") ||
-        u.includes("example") ||   
-        u.includes("example.com") ||  
-        u.includes("voe.sx/") ||
-        u.includes("diasfem.com/") ||
-        u.includes("fembed.com") ||
-        u.includes("sbfull.com") ||
-        u.includes("sbfast.com") ||
-        u.includes("4shared.com/") ||
-        u.includes("play.php")
-    );
+    if (REPRODUCTORES_BLOQUEADOS.some(d => u.includes(d))) return true;
+    if (!REPRODUCTORES_PERMITIDOS.some(d => u.includes(d))) return true;
+    return false;
 }
 
 function itemTieneVideo(item) {
@@ -657,6 +656,7 @@ async function abrirDetalle(item, autoPlay = false, force = false) {
         renderTemporadas(item);
     } else {
         renderServidoresYDescargas(item.embeds, item.downloads, item.reproductor, item);
+        embeds = embedsRaw.filter(e => e && e.url && !esEmbedInvalido(e.url));
         if (autoPlay) reproducir(item.embeds && item.embeds[0] ? item.embeds[0] : { url: item.reproductor }, item);
     }
 }
