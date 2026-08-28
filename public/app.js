@@ -518,7 +518,16 @@ async function cargarHome() {
             series: series.length,
             anime: anime.length
         });
-        renderCarousel("carousel-movies", peliculas);
+        // Solo estrenos / año actual (2026) o el más reciente disponible
+        const anioActual = new Date().getFullYear(); // 2026
+        let destacadas = peliculas.filter(p => Number(p.year) === anioActual);
+        if (destacadas.length < 4) {
+            // Si hay pocas de 2026, completar con las más nuevas (2025, 2024...)
+            destacadas = [...peliculas]
+                .sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0))
+                .slice(0, 12);
+        }
+        renderCarousel("carousel-movies", destacadas);
         renderCarousel("carousel-series", series);
         renderCarousel("carousel-anime", anime);
         cargarContinuarViendo();
