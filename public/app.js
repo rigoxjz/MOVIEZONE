@@ -207,6 +207,7 @@ function mostrarGrid({ modo, seccion = "movie", termino = "" }) {
     if (modo === "search") {
         resultsTitle.textContent = `Resultados para "${termino}"`;
         document.getElementById("filter-toolbar").classList.add("hidden");
+        busquedaEsLocal = true; // por si se llama desde otro sitio
     } else if (modo === "favoritos") {
         resultsTitle.innerHTML = `<ion-icon name="heart" style="vertical-align:-3px;"></ion-icon> Mis Favoritos`;
         document.getElementById("filter-toolbar").classList.add("hidden");
@@ -237,9 +238,52 @@ async function fetchSeccion(seccion, page, limit = LIMIT) {
     return data.resultados || [];
 }
 
-async function fetchBusqueda(termino) {
-    const data = await searchCatalog(termino);
-    return data.resultados || [];
+// Estado extra
+let busquedaEsLocal = true; // true = resultados locales, false = ya buscamos online
+
+async function fetchBusqueda(termino, source = "local") {
+    const data = await searchCatalog(termino, source);
+    return {
+        resultados: data.resultados || [],
+        total: data.total ?? 0,
+        source: data.source || source
+    };
+}
+
+function actualizarBotonOnline(mostrar) {
+    let btn = document.getElementById("btn-buscar-online");
+    if (!btn) {
+        // Crear el botón si no existe
+        const header = document.querySelector(".grid-header");
+        if (!header) return;
+
+        btn = document.createElement("button");
+        btn.id = "btn-buscar-online";
+        btn.className = "btn-buscar-online";
+        btn.innerHTML = `
+            <ion-icon name="search-outline"></ion-icon>
+            <span>Buscar online</span>
+        `;
+        btn.addEventListener("click", async () => {
+            if (!gridTermino || gridCargando) return;
+            busquedaEsLocal = false;
+            btn.disabled = true;
+            btn.innerHTML = `<div class="spinner-inline"></div> Buscando online...`;
+            await cargarPaginaGrid();
+        });
+        header.appendChild(btn);
+    }
+
+    if (mostrar) {
+        btn.classList.remove("hidden");
+        btn.disabled = false;
+        btn.innerHTML = `
+            <ion-icon name="search-outline"></ion-icon>
+            <span>Buscar online</span>
+        `;
+    } else {
+        btn.classList.add("hidden");
+    }
 }
 
 async function cargarPaginaGrid() {
@@ -260,10 +304,14 @@ async function cargarPaginaGrid() {
             gridTotalPages = 1;
             gridPage = 1;
         } else if (gridModo === "search") {
-            lista = await fetchBusqueda(gridTermino);
-            gridTotalItems = lista.length;
+            const data = await fetchBusqueda(gridTermino, busquedaEsLocal ? "local" : "online");
+            lista = data.resultados;
+            gridTotalItems = data.total;
             gridTotalPages = 1;
             gridPage = 1;
+
+            // Mostrar / ocultar botón "Buscar online"
+            actualizarBotonOnline(busquedaEsLocal);
         } else {
             // Sección normal → aquí se actualiza gridTotalItems y gridTotalPages
             lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
@@ -1279,6 +1327,7 @@ searchForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const texto = searchInput.value.trim();
     if (texto) {
+        busquedaEsLocal = true;          // ← importante
         mostrarGrid({ modo: "search", termino: texto });
     }
 });
