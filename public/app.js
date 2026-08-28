@@ -557,6 +557,38 @@ async function cargarHome() {
     }
 }
 
+
+
+async function abrirDesdeProgreso(mini) {
+    // 1) Abrir ya con lo que hay (poster, título…)
+    await abrirDetalle({
+        ...mini,
+        tiene_player: true,
+        embeds: mini.embeds || [],
+        episodios: mini.episodios || []
+    }, false, false);
+
+    // 2) Completar desde Supabase / API (misma info que al abrir normal)
+    try {
+        const params = new URLSearchParams();
+        if (mini.postId) params.set("postId", mini.postId);
+        if (mini.link) params.set("link", mini.link);
+        if (mini.id && !mini.postId) params.set("postId", mini.id);
+
+        if (![...params.keys()].length) return;
+
+        const res = await fetch(`/api/detalle?${params.toString()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const completo = await res.json();
+        if (completo && (completo.nombre || completo.link)) {
+            // Reabrir con datos completos (servidores, sinopsis, etc.)
+            await abrirDetalle({ ...completo, tiene_player: true }, false, false);
+        }
+    } catch (err) {
+        console.warn("No se pudo completar desde progreso:", err);
+    }
+}
+
 // ======================================================
 // DETALLE (modal inmersivo)
 // ======================================================
@@ -1584,18 +1616,26 @@ function guardarProgreso(item, segundos = 0, duracion = 0) {
     const all = obtenerProgreso();
     all[key] = {
         link: item.link || null,
-        id: item.id || item.postId || null,
+        id: item.id || null,
+        postId: item.postId || item.id || null,
         nombre: item.nombre,
         portada: item.portada,
+        backdrop: item.backdrop || null,
         tipo: item.tipo,
         year: item.year,
         calificacion: item.calificacion,
+        descripcion: item.descripcion || null,
+        genero: item.genero || null,
+        // importante para el badge
+        tiene_player: true,
+        // no hace falta guardar todos los embeds (pesan); al abrir se piden a la API
         segundos: Math.max(0, Math.floor(segundos)),
         duracion: Math.max(0, Math.floor(duracion)),
         updated: Date.now()
     };
-    // máximo 30 títulos
-    const ordenados = Object.entries(all).sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0)).slice(0, 30);
+    const ordenados = Object.entries(all)
+        .sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0))
+        .slice(0, 30);
     localStorage.setItem("moviezone_progress", JSON.stringify(Object.fromEntries(ordenados)));
 }
 
@@ -1635,25 +1675,37 @@ function cargarContinuarViendo() {
         .filter(x => x && (x.segundos || 0) > 10)
         .sort((a, b) => (b.updated || 0) - (a.updated || 0))
         .slice(0, 12);
+
     const row = document.getElementById("row-continuar");
     const cont = document.getElementById("carousel-continuar");
     if (!row || !cont) return;
+
     if (!lista.length) {
         row.classList.add("hidden");
         return;
     }
     row.classList.remove("hidden");
     cont.innerHTML = "";
+
     lista.forEach(item => {
+        item.tiene_player = true;
         const card = crearMediaCard(item);
-        // barra de progreso
+
+        // barra progreso
         const pct = item.duracion > 0
             ? Math.min(100, Math.round((item.segundos / item.duracion) * 100))
-            : Math.min(95, Math.round((item.segundos / 600) * 100)); // fallback ~10 min
+            : Math.min(95, Math.round((item.segundos / 600) * 100));
         const bar = document.createElement("div");
         bar.className = "progress-bar-wrap";
         bar.innerHTML = `<div class="progress-bar-fill" style="width:${pct}%"></div>`;
         card.querySelector(".poster-wrapper")?.appendChild(bar);
+
+        // Reemplazar handler: solo abrirDesdeProgreso
+        const clone = card.cloneNode(true);
+        clone.addEventListener("click", () => abrirDesdeProgreso(item));
+        cont.appendChild(clone);
+    });
+
         cont.appendChild(card);
     });
 }
