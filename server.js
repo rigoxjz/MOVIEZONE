@@ -3119,52 +3119,56 @@ app.get("/api/detalle", async (req, res) => {
         }
 
         // --------------------------------------------------
-        // CACHÉ INTELIGENTE (por sesión de Render)
-        // - Series/Anime: se refrescan UNA vez por arranque del servidor
-        //   (primera vez que entras tras despertar → refresh; si vuelves a entrar → Supabase)
-        // - Películas: si ya tienen player válido → solo Supabase
-        // - force=1 → forzar re-enriquecimiento
+        // REGLA:
+        // - Si YA tiene player/episodios válidos → SOLO Supabase (no scrapear)
+        // - Solo se re-enriquece con force=1 (botón "Actualizar servidores")
+        //   o si todavía NO tiene contenido válido
         // --------------------------------------------------
         const esSerieOAnime = item.tipo === "Serie" || item.tipo === "Anime";
         const yaValido = itemTieneContenidoValido(item);
-        const sessionKey = String(item.postId || item.link || item.nombre || "");
-        const yaRefrescadoEstaSesion = sessionKey && refreshedThisSession.has(sessionKey);
 
-        // Película con player válido → caché
-        if (!esSerieOAnime && yaValido && !force) {
-            console.log(`[Cache] Película desde Supabase: "${item.nombre}"`);
+        // Cualquier título (peli/serie/anime) con contenido válido → devolver de Supabase
+        if (yaValido && !force) {
+            console.log(`[Cache] Desde Supabase (ya válido): "${item.nombre}"`);
             return res.json(item);
         }
 
-        // Serie/Anime ya refrescada en esta sesión y con contenido válido → caché
-        if (esSerieOAnime && yaValido && yaRefrescadoEstaSesion && !force) {
-            console.log(`[Cache] Serie/Anime desde Supabase (ya refrescada esta sesión): "${item.nombre}"`);
-            return res.json(item);
-        }
-
-        if (esSerieOAnime && !yaRefrescadoEstaSesion) {
-            console.log(`[Refresh] Primera vez esta sesión → refrescando serie/anime: "${item.nombre}"`);
-        } else if (force) {
+        if (force) {
             console.log(`[Force] Re-enriqueciendo forzado: "${item.nombre}"`);
         } else {
             console.log(`[Enrich] Sin contenido válido → enriqueciendo: "${item.nombre}"`);
         }
 
+        // Guardamos copia de lo que había en Supabase para no perder datos
+        const itemAnterior = { ...item };
+
         // Enriquecer (Lamovie → Hackstore si hace falta)
         const enriquecido = await enriquecerItem({ ...item, postId: item.postId || postId });
 
-        // Guardamos la versión completa en Supabase
-        await guardarEnSupabase([enriquecido]);
-
-        // Marcar como refrescado en esta sesión (series/anime)
-        if (esSerieOAnime && sessionKey) {
-            refreshedThisSession.add(sessionKey);
-            // También por el postId del enriquecido por si cambió
-            if (enriquecido.postId) refreshedThisSession.add(String(enriquecido.postId));
-            if (enriquecido.link) refreshedThisSession.add(String(enriquecido.link));
+        // Si el refresh NO trajo nada útil → NO guardar, devolver lo de Supabase
+        if (!itemTieneContenidoValido(enriquecido)) {
+            console.log(`[Protect] Refresh sin datos útiles para "${itemAnterior.nombre}". Se mantiene Supabase.`);
+            // Si el anterior tampoco tenía nada, devolvemos el enriquecido igual (por si trajo sinopsis, etc.)
+            if (itemTieneContenidoValido(itemAnterior)) {
+                return res.json(itemAnterior);
+            }
+            // Mezclar metadatos nuevos sin borrar embeds/episodios viejos
+            const mezclado = {
+                ...itemAnterior,
+                ...enriquecido,
+                embeds: (itemAnterior.embeds && itemAnterior.embeds.length) ? itemAnterior.embeds : (enriquecido.embeds || []),
+                downloads: (itemAnterior.downloads && itemAnterior.downloads.length) ? itemAnterior.downloads : (enriquecido.downloads || []),
+                episodios: (itemAnterior.episodios && itemAnterior.episodios.length) ? itemAnterior.episodios : (enriquecido.episodios || []),
+                reproductor: itemAnterior.reproductor || enriquecido.reproductor || null,
+                temporadas: (itemAnterior.temporadas && itemAnterior.temporadas.length) ? itemAnterior.temporadas : (enriquecido.temporadas || [])
+            };
+            return res.json(mezclado);
         }
 
-        // Invalidar cachés de listado para que el grid se actualice
+        // Sí trajo datos válidos → guardar en Supabase
+        await guardarEnSupabase([enriquecido]);
+
+        // Invalidar cachés de listado
         try {
             const files = await fs.readdir(CACHE_DIR);
             await Promise.all(
