@@ -214,17 +214,22 @@
           <h3>Detalles del Contenido</h3>
           <p>Selecciona un elemento para ver su sinopsis, temporadas, servidores y opciones de descarga.</p>
         </div>
-
         <div class="details-content-inner hidden" id="details-content">
           <div class="details-header-card">
             <img id="details-poster" src="" alt="Poster" class="details-poster">
             <div class="details-meta-info">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                 <span class="media-type-badge" id="details-type">PELICULA</span>
-                <button class="btn-icon" id="btn-favorito" title="Agregar a favoritos">
-                  <ion-icon name="heart-outline" id="btn-favorito-icon"></ion-icon>
-                </button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <button class="btn-icon" id="btn-share" title="Copiar enlace">
+                    <ion-icon name="share-outline" id="btn-share-icon"></ion-icon>
+                  </button>
+                  <button class="btn-icon" id="btn-favorito" title="Agregar a favoritos">
+                    <ion-icon name="heart-outline" id="btn-favorito-icon"></ion-icon>
+                  </button>
+                </div>
               </div>
+      <!-- aquí sigue el título, año, rating, etc. -->
               <h3 id="details-title">Título del Contenido</h3>
               <p id="details-original-title" class="subtext"></p>
 
