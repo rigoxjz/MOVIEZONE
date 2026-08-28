@@ -436,6 +436,9 @@ body {
 .carousel-row h2 {
   margin-top: 12px;
   margin-bottom: 14px;
+  margin-left: 0;
+  padding-left: 4%;   /* mismo aire que el resto de la página */
+  padding-right: 4%;
   font-size: 1.25rem;
   font-weight: 700;
 }
@@ -1488,18 +1491,15 @@ body {
   .carousel-section {
     padding: 20px 0 30px;
   }
-  /*
-  .carousel-row h2 {
-    font-size: 18px;
-    padding: 0 4%;
-    margin-bottom: 12px;
-  }*/
-  .carousel-row h2 {
-    margin-top: 12px;
-    margin-bottom: 14px;
-    font-size: 1.25rem;
-    font-weight: 700;
-  }
+.carousel-row h2 {
+  margin-top: 12px;
+  margin-bottom: 14px;
+  margin-left: 0;
+  padding-left: 4%;   /* mismo aire que el resto de la página */
+  padding-right: 4%;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
   .carousel-container {
     padding: 0 4%;
     gap: 10px;
