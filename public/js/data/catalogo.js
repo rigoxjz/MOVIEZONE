@@ -20,10 +20,11 @@ export async function getCatalog(type, page = 1, limit = 28) {
   };
 }
 
-export async function searchCatalog(termino) {
-  const data = await get('/buscar', { q: termino });
+export async function searchCatalog(termino, source = "local") {
+  const data = await get("/buscar", { q: termino, source });
   return {
     resultados: data.resultados || [],
-    total: data.total ?? (data.resultados || []).length
+    total: data.total ?? (data.resultados || []).length,
+    source: data.source || source
   };
 }
