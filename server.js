@@ -2365,7 +2365,7 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
     }
     // 1b. Búsqueda local en Supabase (soporta varias palabras
-    /*
+    // 1b. Búsqueda LOCAL en Supabase (rápida, sin scrapear)
     if (termino && moviesDB.length > 0) {
         const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
 
@@ -2374,13 +2374,25 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             return palabras.every(p => texto.includes(p));
         });
 
-        if (filtrados.length > 0) {
+        // Si solo queremos local, o si hay resultados locales → devolverlos
+        if (soloLocal || filtrados.length > 0) {
             console.log(`Búsqueda local Supabase: ${filtrados.length} resultados para "${termino}"`);
             const pagina = filtrados.slice(0, limit);
-            await setCache(cacheKey, pagina);
-            return pagina;
+            return {
+                resultados: pagina,
+                total: filtrados.length,
+                page: 1,
+                limit,
+                source: "local"
+            };
         }
-    }*/
+    }
+
+    // Si pidieron solo local y no hay nada, devolver vacío (no scrapear)
+    if (soloLocal) {
+        return { resultados: [], total: 0, page: 1, limit, source: "local" };
+    }
+    // A partir de aquí sigue el scraping actual (Lamovie + Hackstore)...
 
     // 2. SEGUNDO: Caché temporal (solo si Supabase no tenía datos)
     if (!termino) {
@@ -2814,7 +2826,7 @@ process.on("unhandledRejection", async (reason) => {
 // ======================================================
 // API BÚSQUEDA
 // ======================================================
-app.get(
+/*app.get(
     "/api/buscar",
     limiterBusqueda,
     async (req, res) => {
@@ -2852,7 +2864,36 @@ app.get(
             });
         }
     }
-);
+);*/
+
+app.get("/api/buscar", limiterBusqueda, async (req, res) => {
+    try {
+        const termino = String(req.query.q || "").trim();
+        const soloLocal = req.query.source === "local" || req.query.local === "1";
+
+        if (!termino) {
+            return res.status(400).json({ error: "Escribe algo para buscar" });
+        }
+
+        const data = await buscar(termino, null, 1, 48, soloLocal);
+
+        // Asegurar formato unificado
+        const resultados = Array.isArray(data) ? data : (data.resultados || []);
+        const total = Array.isArray(data) ? resultados.length : (data.total ?? resultados.length);
+
+        res.json({
+            resultados,
+            total,
+            page: data.page || 1,
+            limit: data.limit || 48,
+            source: data.source || (soloLocal ? "local" : "online")
+        });
+    } catch (error) {
+        console.error("Error en /api/buscar:", error);
+        await enviarTelegram(`⚠️ Error en /api/buscar\n${error.message}`);
+        res.status(500).json({ error: "No se pudo realizar la búsqueda" });
+    }
+});
 // ======================================================
 // PELÍCULAS
 // ======================================================
