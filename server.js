@@ -159,6 +159,7 @@ async function guardarEnSupabase(items) {
         .filter(item => item.link)
         .map(item => {
             // Evitar que el nombre de la serie se contamine con " - Temporada X Episodio Y"
+            tiene_player: itemTieneContenidoValido(item),
             let nombre = item.nombre || null;
             if (nombre && (item.tipo === "Serie" || item.tipo === "Anime")) {
                 nombre = nombre
@@ -2878,12 +2879,16 @@ app.get("/api/buscar", limiterBusqueda, async (req, res) => {
     try {
         const termino = String(req.query.q || "").trim();
         const soloLocal = req.query.source === "local" || req.query.local === "1";
+        const page  = Math.max(1, parseInt(req.query.page)  || 1);
+        const limit = Math.min(48, Math.max(12, parseInt(req.query.limit) || 28));
+        const type  = req.query.type || null;
+        const order = req.query.order || "recent";
 
         if (!termino) {
             return res.status(400).json({ error: "Escribe algo para buscar" });
         }
 
-        const data = await buscar(termino, null, 1, 48, soloLocal);
+        const data = await buscar(termino, type, page, limit, soloLocal);
 
         // Asegurar formato unificado
         const resultados = Array.isArray(data) ? data : (data.resultados || []);
@@ -2940,6 +2945,22 @@ app.get("/api/catalogo", async (req, res) => {
     }
 });
 
+
+app.get("/api/recien", async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 12, 40);
+        const { data, error } = await supabase
+            .from("movies")          // ← cambia al nombre real de tu tabla
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(limit);
+        if (error) throw error;
+        res.json({ resultados: data || [] });
+    } catch (err) {
+        console.error("Error /api/recien:", err.message);
+        res.status(500).json({ error: "No se pudieron cargar los recién añadidos", resultados: [] });
+    }
+});
 // ======================================================
 // SERIES (con paginación)
 // ======================================================
