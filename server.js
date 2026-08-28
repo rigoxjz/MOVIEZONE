@@ -371,21 +371,42 @@ function esReproductorValido(url) {
     return true;
 }
 */
+// Dominios que SÍ aceptamos como reproductor
+const REPRODUCTORES_PERMITIDOS = [
+    "vimeos.net", "player.vimeos",
+    "goodstream.one", "goodstream.uno", "goodstream",
+    "streamwish", "filemoon", "voe.sx", "voe.",
+    "doodstream", "dood.", "ds2play", "doods.pro",
+    "streamtape", "mixdrop", "upstream",
+    "vidmoly", "mp4upload", "uqload",
+    "vidhide", "vidguard", "lulustream", "filelions",
+    "yourupload", "supervideo", "krakenfiles",
+    "ok.ru", "okru",
+    // quita o añade según los que realmente te funcionen
+];
+
+// Dominios basura (Hackstore / placeholders) — rechazo explícito
+const REPRODUCTORES_BLOQUEADOS = [
+    "sblongvu.com", "sblongvu", "sblanh", "sbfull", "sbfast",
+    "sbthe.com", "sbanh", "sbrity", "sbbrisk", "sblona",
+    "lvturbo", "diasfem", "fembed", "4shared",
+    "lamovie.org", "lamovie", "youtube.com", "youtu.be",
+    "play.php", "example.com", "hackstore"
+];
+
 function esReproductorValido(url) {
     if (!url) return false;
-    const u = String(url).toLowerCase();
+    const u = String(url).toLowerCase().trim();
 
-    if (esYouTube(url)) return false;
-    if (esReproductorLamovie(url)) return false;
-    
-    // Rechazar imágenes (pósters, backdrops, etc. que aparecen sueltas en el HTML)
-    if (/\.(jpg|jpeg|png|webp|gif|svg|ico|bmp)(\?|$)/i.test(u)) return false;
-    if (u.includes("image.tmdb.org") || u.includes("sbfull.com") || u.includes("sbfast.com") || u.includes("themoviedb.org")) return false;
+    if (!/^https?:\/\//i.test(u)) return false;
+    if (/\.(jpg|jpeg|png|webp|gif|svg|ico|bmp|css|woff2?|ttf|eot)(\?|$)/i.test(u)) return false;
+    if (u.includes("image.tmdb.org") || u.includes("themoviedb.org")) return false;
 
-    // Rechazar hojas de estilo, fuentes y scripts que a veces se cuelan también
-    if (/\.(css|woff2?|ttf|eot)(\?|$)/i.test(u)) return false;
+    // Bloqueados siempre
+    if (REPRODUCTORES_BLOQUEADOS.some(d => u.includes(d))) return false;
 
-    return true;
+    // Solo permitidos
+    return REPRODUCTORES_PERMITIDOS.some(d => u.includes(d));
 }
 
 async function obtenerHackstore(url) {
@@ -815,7 +836,10 @@ async function procesarPaginaHackstore(link) {
                 nombre: epSoloTrailer ? `${ep.nombre} (Solo trailer)` : ep.nombre,
                 link: ep.link,
                 video,
-                embeds: video ? [{ url: video, server: "Hackstore", name: "Hackstore" }] : [],
+                embeds: (reproductor && esReproductorValido(reproductor))
+                    ? [{ url: reproductor, server: detectarServerDesdeUrl(reproductor, "Servidor"), name: detectarServerDesdeUrl(reproductor, "Servidor") }]
+                    : [],
+                reproductor: (reproductor && esReproductorValido(reproductor)) ? reproductor : null,
                 downloads: [],
                 soloTrailer: epSoloTrailer
             });
