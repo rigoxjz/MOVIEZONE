@@ -2330,3 +2330,19 @@ body {
 .btn-refresh-servers ion-icon {
   font-size: 1rem;
 }
+
+
+.progress-bar-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  z-index: 5;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a855f7, #c084fc);
+  border-radius: 0 2px 2px 0;
+}
