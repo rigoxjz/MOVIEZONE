@@ -374,6 +374,7 @@ body {
 .hero-actions {
   display: flex;
   gap: 12px;
+  margin-bottom: 28px; /* separa de los dots y del carrusel */
 }
 .btn-hero {
   display: flex;
@@ -416,22 +417,28 @@ body {
 
 /* --- Homepage Layout: Carousels --- */
 .carousel-section {
-  margin-top: -60px; /* Overlap with hero banner bottom gradient */
+  margin-top: -20px; /* Overlap with hero banner bottom gradient */
   display: flex;
   flex-direction: column;
-  gap: 35px;
+  gap: 28px;
 }
 .carousel-row {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
+/*
 .carousel-row h2 {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.2px;
+}*/
+.carousel-row h2 {
+  margin-top: 12px;
+  margin-bottom: 14px;
+  font-size: 1.25rem;
+  font-weight: 700;
 }
-
 .carousel-container {
   display: flex;
   gap: 16px;
@@ -1481,10 +1488,17 @@ body {
   .carousel-section {
     padding: 20px 0 30px;
   }
+  /*
   .carousel-row h2 {
     font-size: 18px;
     padding: 0 4%;
     margin-bottom: 12px;
+  }*/
+  .carousel-row h2 {
+    margin-top: 12px;
+    margin-bottom: 14px;
+    font-size: 1.25rem;
+    font-weight: 700;
   }
   .carousel-container {
     padding: 0 4%;
@@ -1795,7 +1809,7 @@ body {
 /* 5. Hero Rotation Dots */
 .hero-dots {
   position: absolute;
-  bottom: 30px;
+  bottom: 18px;   /* antes ~30px; más abajo = más separado del texto */
   right: 4%;
   z-index: 10;
   display: flex;
