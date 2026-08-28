@@ -11,6 +11,10 @@
   <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 
   <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0611">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
   <div class="bg-shape shape-1"></div>
@@ -116,6 +120,21 @@
           </div>
         </div>
       </div>
+      <div class="carousel-row hidden" id="row-continuar">
+        <h2>Continuar viendo</h2>
+        <div class="carousel-container" id="carousel-continuar"></div>
+      </div>
+
+      <div class="carousel-row">
+        <h2>Recién añadidos</h2>
+        <div class="carousel-container" id="carousel-recien">
+          <div class="skeleton-row">
+            <div class="skeleton-card"></div><div class="skeleton-card"></div>
+            <div class="skeleton-card"></div><div class="skeleton-card"></div>
+            <div class="skeleton-card"></div><div class="skeleton-card"></div>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -126,6 +145,14 @@
         <button class="filter-chip" data-type="movie">🎬 Películas</button>
         <button class="filter-chip" data-type="series">📺 Series</button>
         <button class="filter-chip" data-type="anime">⛩️ Anime</button>
+      </div>
+      <div class="filter-group sort-group">
+        <label for="sort-select" class="sort-label">Ordenar:</label>
+        <select id="sort-select" class="sort-select">
+          <option value="recent">Más reciente</option>
+          <option value="rating">Mejor calificación</option>
+          <option value="az">A–Z</option>
+        </select>
       </div>
     </div>
 
@@ -139,6 +166,15 @@
       <p>Consultando fuentes de contenido...</p>
     </div>
 
+    <div class="catalog-grid skeleton-grid hidden" id="results-skeleton">
+      <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      <div class="skeleton-card"></div><div class="skeleton-card"></div>
+    </div>
+    
     <div class="downloads-empty hidden" id="results-empty">
       <ion-icon name="film-outline"></ion-icon>
       <p>No se encontraron resultados.</p>
@@ -220,6 +256,10 @@
 
           <div class="details-section" id="servers-section">
             <h4 id="servers-section-title">Servidores de Reproducción</h4>
+            <button type="button" class="btn-refresh-servers" id="btn-refresh-servers" title="Forzar actualización de servidores">
+              <ion-icon name="refresh-outline"></ion-icon>
+              <span>Actualizar servidores</span>
+            </button>
             <div class="loading-state hidden" id="servers-loading">
               <div class="spinner"></div>
               <p>Buscando servidores disponibles...</p>
