@@ -2332,7 +2332,7 @@ async function procesarEpisodios(item) {
 // ======================================================
 // BUSCAR / LISTAR
 // ======================================================
-async function buscar(termino, seccion = null, page = 1, limit = 24) {
+async function buscar(termino, seccion = null, page = 1, limit = 24, soloLocal = false) {
     let cacheKey;
     if (termino) {
         cacheKey = "search_" + termino.toLowerCase().trim().replace(/\s+/g, "_");
@@ -2364,7 +2364,6 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             return { resultados: pagina, total: totalItems, page, limit };
         }
     }
-    // 1b. Búsqueda local en Supabase (soporta varias palabras
     // 1b. Búsqueda LOCAL en Supabase (rápida, sin scrapear)
     if (termino && moviesDB.length > 0) {
         const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -2374,12 +2373,11 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
             return palabras.every(p => texto.includes(p));
         });
 
-        // Si solo queremos local, o si hay resultados locales → devolverlos
-        if (soloLocal || filtrados.length > 0) {
+        // Solo devolver aquí si pidieron búsqueda local
+        if (soloLocal) {
             console.log(`Búsqueda local Supabase: ${filtrados.length} resultados para "${termino}"`);
-            const pagina = filtrados.slice(0, limit);
             return {
-                resultados: pagina,
+                resultados: filtrados.slice(0, limit),
                 total: filtrados.length,
                 page: 1,
                 limit,
@@ -2388,7 +2386,7 @@ async function buscar(termino, seccion = null, page = 1, limit = 24) {
         }
     }
 
-    // Si pidieron solo local y no hay nada, devolver vacío (no scrapear)
+    // Pidieron solo local y no había nada en memoria / DB
     if (soloLocal) {
         return { resultados: [], total: 0, page: 1, limit, source: "local" };
     }
