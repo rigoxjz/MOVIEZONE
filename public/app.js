@@ -289,13 +289,13 @@ async function fetchBusqueda(termino, source = "local") {
 function actualizarBotonOnline(mostrar) {
     let btn = document.getElementById("btn-buscar-online");
     if (!btn) {
-        // Crear el botón si no existe
         const header = document.querySelector(".grid-header");
         if (!header) return;
 
         btn = document.createElement("button");
         btn.id = "btn-buscar-online";
-        btn.className = "btn-buscar-online";
+        btn.className = "btn-buscar-online hidden";
+        btn.style.display = "none";
         btn.innerHTML = `
             <ion-icon name="search-outline"></ion-icon>
             <span>Buscar online</span>
@@ -310,8 +310,9 @@ function actualizarBotonOnline(mostrar) {
         header.appendChild(btn);
     }
 
-    if (mostrar) {
+    if (mostrar && gridModo === "search") {
         btn.classList.remove("hidden");
+        btn.style.display = "inline-flex";
         btn.disabled = false;
         btn.innerHTML = `
             <ion-icon name="search-outline"></ion-icon>
@@ -319,6 +320,7 @@ function actualizarBotonOnline(mostrar) {
         `;
     } else {
         btn.classList.add("hidden");
+        btn.style.display = "none";
     }
 }
 
@@ -342,16 +344,18 @@ async function cargarPaginaGrid() {
             gridTotalItems = lista.length;
             gridTotalPages = 1;
             gridPage = 1;
+            actualizarBotonOnline(false);
         } else if (gridModo === "search") {
             const data = await fetchBusqueda(gridTermino, busquedaEsLocal ? "local" : "online");
             lista = data.resultados;
             gridTotalItems = data.total;
             gridTotalPages = 1;
             gridPage = 1;
-
+            actualizarBotonOnline(false);
             // Mostrar / ocultar botón "Buscar online"
             actualizarBotonOnline(busquedaEsLocal);
         } else {
+            actualizarBotonOnline(false);
             // Sección normal → aquí se actualiza gridTotalItems y gridTotalPages
             lista = await fetchSeccion(gridSeccion, gridPage, LIMIT);
         }
