@@ -2366,14 +2366,25 @@ async function buscar(termino, seccion = null, page = 1, limit = 24, soloLocal =
     }
     // 1b. Búsqueda LOCAL en Supabase (rápida, sin scrapear)
     if (termino && moviesDB.length > 0) {
-        const palabras = termino.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        // Quita acentos, pasa a minúsculas y limpia espacios
+        const normalizar = (str) =>
+            String(str || "")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") // quita tildes / diacríticos
+                .replace(/\s+/g, " ")
+                .trim();
+
+        const palabras = normalizar(termino).split(" ").filter(Boolean);
 
         const filtrados = moviesDB.filter(item => {
-            const texto = `${item.nombre || ""} ${item.titulo_original || ""}`.toLowerCase();
+            const texto = normalizar(
+                `${item.nombre || ""} ${item.titulo_original || ""}`
+            );
+            // Todas las palabras del término deben aparecer en el título
             return palabras.every(p => texto.includes(p));
         });
 
-        // Solo devolver aquí si pidieron búsqueda local
         if (soloLocal) {
             console.log(`Búsqueda local Supabase: ${filtrados.length} resultados para "${termino}"`);
             return {
@@ -2386,7 +2397,6 @@ async function buscar(termino, seccion = null, page = 1, limit = 24, soloLocal =
         }
     }
 
-    // Pidieron solo local y no había nada en memoria / DB
     if (soloLocal) {
         return { resultados: [], total: 0, page: 1, limit, source: "local" };
     }
