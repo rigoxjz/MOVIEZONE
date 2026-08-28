@@ -408,7 +408,7 @@ function crearMediaCard(item) {
             <div class="rating-badge"><ion-icon name="star"></ion-icon> ${escapeHtml(rating)}</div>
             <span class="type-badge">${escapeHtml(tipo)}</span>
             <span class="availability-badge ${tieneVideo ? "available" : "unavailable"}">
-                <span class="dot"></span> ${tieneVideo ? "▶ Listo" : "Sin servidores"}
+                <span class="dot"></span> ${tieneVideo ? "▶ Disponible" : "Sin servidores"}
             </span>
         </div>
         <div class="media-info">
