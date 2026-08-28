@@ -159,7 +159,6 @@ async function guardarEnSupabase(items) {
         .filter(item => item.link)
         .map(item => {
             // Evitar que el nombre de la serie se contamine con " - Temporada X Episodio Y"
-            tiene_player: itemTieneContenidoValido(item),
             let nombre = item.nombre || null;
             if (nombre && (item.tipo === "Serie" || item.tipo === "Anime")) {
                 nombre = nombre
@@ -192,7 +191,8 @@ async function guardarEnSupabase(items) {
                 solo_trailer: !!item.soloTrailer,
                 episodios: item.episodios || [],
                 temporadas: item.temporadas || [],
-                postId: item.postId || null
+                postId: item.postId || null,
+                tiene_player: itemTieneContenidoValido(item)   // ✅ AQUÍ, dentro del return
             };
         });
 
@@ -2388,10 +2388,11 @@ async function buscar(termino, seccion = null, page = 1, limit = 24, soloLocal =
 
         if (soloLocal) {
             console.log(`Búsqueda local Supabase: ${filtrados.length} resultados para "${termino}"`);
+            const inicio = (page - 1) * limit;
             return {
-                resultados: filtrados.slice(0, limit),
+                resultados: filtrados.slice(inicio, inicio + limit),
                 total: filtrados.length,
-                page: 1,
+                page,
                 limit,
                 source: "local"
             };
